@@ -1,144 +1,150 @@
-# 01 — LLMs, Tokens, Context
+# 01 — LLM, token, contesto
 
-> **Objectives**
-> - Explain what a model actually does on each call.
-> - Convert between text, tokens, and cost.
-> - Predict which tasks will fail because of context, not intelligence.
+> **Obiettivi**
+> - Spiegare cosa fa davvero un modello a ogni chiamata.
+> - Convertire tra testo, token e costo.
+> - Prevedere quali compiti falliranno per il contesto, non per l'intelligenza.
 
-## What the model does
+## Cosa fa il modello
 
-A language model is a function:
+Un modello linguistico è una funzione:
 
 ```
-tokens_in → probability distribution over the next token
+token_in → distribuzione di probabilità sul token successivo
 ```
 
-Everything else is scaffolding. It has no memory, no state, no ability to run
-code, and no knowledge of what happened in the previous call unless that
-previous call is in the text you send.
+Tutto il resto è impalcatura. Non ha memoria, non ha stato, non può eseguire
+codice e non sa cosa è successo nella chiamata precedente se quella chiamata non
+è nel testo che gli invii.
 
-Three consequences you will feel every day:
+Tre conseguenze che sentirai ogni giorno:
 
-1. **Statelessness.** The "conversation" is an illusion. Every call resends the
-   whole transcript. The harness is the memory.
-2. **Sampling.** Unless temperature is 0, the same prompt can produce different
-   output. Even at 0, providers are not perfectly reproducible.
-3. **No execution.** When a model "runs a test", it emitted a structured
-   request. Something else ran the test and pasted the result back.
+1. **Assenza di stato.** La "conversazione" è un'illusione. Ogni chiamata
+   reinvia l'intera trascrizione. La memoria è l'harness.
+2. **Campionamento.** Senza temperatura 0, lo stesso prompt può produrre output
+   diversi. Anche a 0 i provider non sono perfettamente riproducibili.
+3. **Nessuna esecuzione.** Quando un modello "esegue un test", ha emesso una
+   richiesta strutturata. Qualcos'altro ha eseguito il test e ha incollato il
+   risultato.
 
-## Tokens
+## I token
 
-A token is a subword chunk. Rules of thumb:
+Un token è un pezzo di parola. Regole pratiche:
 
-| Content | Approx. chars/token |
+| Contenuto | Caratteri/token approx. |
 |---|---|
-| English prose | ~4 |
+| Prosa inglese | ~4 |
 | Python / TypeScript | ~3 |
-| JSON, minified | ~2.5 |
-| Base64, hashes, minified JS | ~1.5–2 |
-| Non-Latin scripts | ~1–2 |
+| JSON, minificato | ~2,5 |
+| Base64, hash, JS minificato | ~1,5–2 |
+| Scritture non latine | ~1–2 |
 
-So a 1,000-line Python file is roughly 10–15k tokens. A `package-lock.json` can
-be 100k+ tokens on its own. **This is why "just read the whole repo" does not
-work**, and why a single careless `cat` can end a session.
+Quindi un file Python da 1.000 righe vale circa 10–15k token. Un
+`package-lock.json` può valere 100k+ token da solo. **Ecco perché "leggi tutta la
+repo" non funziona**, e perché un singolo `cat` distratto può chiudere una
+sessione.
 
-Count, do not guess:
+Conta, non indovinare:
 
 ```python
 from mini_agent.context import estimate_tokens
 estimate_tokens(open("mini_agent/agent.py").read())
 ```
 
-## The context window
+## La finestra di contesto
 
-The window holds *everything* for one call:
+La finestra contiene *tutto* per una singola chiamata:
 
 ```
 ┌──────────────────────────────────────────────────┐
-│ system prompt          ~500–3,000 tokens         │
-│ instruction files      ~200–5,000 tokens         │
-│ tool schemas           ~100–500 tokens per tool  │
-│ conversation history   grows every turn          │
-│ tool results           the usual culprit         │
-│ (reserved) next reply  ~1,000–8,000 tokens       │
+│ system prompt            ~500–3.000 token        │
+│ file di istruzioni       ~200–5.000 token        │
+│ schemi degli strumenti   ~100–500 token per tool │
+│ cronologia conversazione cresce a ogni turno     │
+│ risultati degli tool     il solito colpevole     │
+│ (riservato) risposta     ~1.000–8.000 token      │
 └──────────────────────────────────────────────────┘
 ```
 
-Two facts that surprise people:
+Due fatti che sorprendono:
 
-- **Tool schemas count.** Forty tools is a few thousand tokens before you say
-  anything, spent on every single call.
-- **The reply needs room.** If you fill the window, the model has nowhere to
-  answer. Hence `ContextBudget.reserve`.
+- **Gli schemi degli strumenti contano.** Quaranta strumenti sono qualche
+  migliaio di token prima ancora di dire qualcosa, spesi a ogni singola
+  chiamata.
+- **La risposta ha bisogno di spazio.** Se riempi la finestra, il modello non ha
+  dove rispondere. Da qui `ContextBudget.reserve`.
 
-### Context rot
+### Degrado del contesto
 
-Bigger windows do not mean you should use them. Models attend unevenly:
-material in the middle of a long context is recalled worse than material at the
-start or end, and irrelevant content measurably degrades reasoning. A 200k
-window stuffed with 180k tokens of logs will often perform *worse* than a 20k
-window with the right 5k.
+Finestre più grandi non significano che devi usarle tutte. I modelli prestano
+attenzione in modo non uniforme: il materiale al centro di un contesto lungo
+viene richiamato peggio di quello all'inizio o alla fine, e il contenuto
+irrilevante peggiora misurabilmente il ragionamento. Una finestra da 200k
+riempita con 180k token di log spesso rende *peggio* di una da 20k con i 5k
+giusti.
 
-Treat the window like RAM in 1995: precious, and the job of the harness is to
-decide what is resident.
+Tratta la finestra come la RAM nel 1995: preziosa, e il lavoro dell'harness è
+decidere cosa resta residente.
 
-## Why agents fail, in model terms
+## Perché gli agenti falliscono, in termini di modello
 
-| Symptom | Mechanism |
+| Sintomo | Meccanismo |
 |---|---|
-| "It invented a file that doesn't exist" | Plausible continuation, no verification step |
-| "It forgot the instruction from 40 turns ago" | Instruction scrolled out or buried mid-context |
-| "It kept editing the same line" | Stale read: its copy of the file is outdated |
-| "It ignored the test failure" | Failure text was truncated or buried |
-| "It got worse after I added docs" | Context rot; irrelevant material diluted attention |
-| "It is slow and expensive" | Every turn resends everything; cost is quadratic in turns |
+| "Ha inventato un file che non esiste" | Continuazione plausibile, nessuna verifica |
+| "Ha dimenticato l'istruzione di 40 turni fa" | L'istruzione è uscita dal contesto o è sepolta |
+| "Continuava a modificare la stessa riga" | Lettura obsoleta: la sua copia del file è vecchia |
+| "Ha ignorato il fallimento del test" | Il testo del fallimento era troncato o sepolto |
+| "È peggiorato dopo che ho aggiunto documentazione" | Degrado del contesto: materiale irrilevante diluisce l'attenzione |
+| "È lento e costoso" | Ogni turno reinvia tutto; il costo è quadratico nei turni |
 
-That last one is worth internalising. Cost per turn ≈ (context size) × (price
-per token). Since context grows each turn, **a 30-turn session costs far more
-than three 10-turn sessions**. Fresh sessions are a cost optimisation, not just
-a hygiene habit.
+Quest'ultimo merita di essere interiorizzato. Costo per turno ≈ (dimensione del
+contesto) × (prezzo per token). Dato che il contesto cresce a ogni turno, **una
+sessione da 30 turni costa molto più di tre sessioni da 10 turni**. Le sessioni
+nuove sono un'ottimizzazione di costo, non solo un'abitudine igienica.
 
-## Determinism and temperature
+## Determinismo e temperatura
 
-- `temperature=0` reduces variance; it does not eliminate it.
-- Coding agents usually run near 0 for edits, higher for brainstorming.
-- Non-determinism is why **evals need repetition** (module 11). A single green
-  run proves almost nothing.
+- `temperature=0` riduce la varianza; non la elimina.
+- Gli agenti di coding di solito girano vicino a 0 per le modifiche, più alti
+  per il brainstorming.
+- Il non determinismo è il motivo per cui **le eval hanno bisogno di
+  ripetizioni** (modulo 11). Una singola esecuzione verde non dimostra quasi
+  nulla.
 
-## What this means for how you prompt
+## Cosa significa per come scrivi i prompt
 
-Because the model only sees the transcript:
+Dato che il modello vede solo la trascrizione:
 
-- Say the constraint *now*, not "as I mentioned earlier".
-- Put critical rules in the system prompt or an instruction file, where they
-  are re-sent every call — not in turn 3 of the chat.
-- Prefer showing the relevant code over describing it. Tokens spent on the
-  actual file beat tokens spent on prose about the file.
-- When output degrades, the first hypothesis is **context**, not capability.
+- Dì il vincolo *adesso*, non "come dicevo prima".
+- Metti le regole critiche nel system prompt o in un file di istruzioni, dove
+  vengono reinviate a ogni chiamata — non al turno 3 della chat.
+- Preferisci mostrare il codice rilevante invece di descriverlo. I token spesi
+  sul file vero battono i token spesi in prosa sul file.
+- Quando la qualità cala, la prima ipotesi è il **contesto**, non la capacità.
 
-## Lab
+## Laboratorio
 
 ```bash
 python3 labs/L01_tokens.py
 ```
 
-You will measure real token counts for prose, code, and JSON, then watch a
-budget reject a transcript and trim it.
+Misurerai i token reali di prosa, codice e JSON, poi vedrai un budget rifiutare
+una trascrizione e troncarla.
 
-## ✅ Checkpoint
+## ✅ Verifica
 
-1. Why does an agent's cost grow faster than linearly with turns?
-2. A 4,000-line repo. Can you put it in a 128k window? Should you?
-3. What does "stateless" mean for how you write follow-up messages?
-4. Why is temperature 0 not a guarantee of reproducibility?
-5. Name two things that consume context before the user says anything.
+1. Perché il costo di un agente cresce più che linearmente con i turni?
+2. Una repo da 4.000 righe. Puoi metterla in una finestra da 128k? Dovresti?
+3. Cosa significa "senza stato" per come scrivi i messaggi di seguito?
+4. Perché temperatura 0 non garantisce la riproducibilità?
+5. Nomina due cose che consumano contesto prima che l'utente dica qualcosa.
 
 <details>
-<summary>Answers</summary>
+<summary>Risposte</summary>
 
-1. Every turn resends the full transcript, which itself grew.
-2. Roughly yes (maybe 40–60k tokens), but no: rot, cost, and latency.
-3. Restate what matters; the model has no memory outside the transcript.
-4. Sampling hardware/kernel nondeterminism, batching, provider changes.
-5. System prompt, instruction files, tool schemas.
+1. Ogni turno reinvia la trascrizione completa, che è cresciuta.
+2. Più o meno sì (forse 40–60k token), ma no: degrado, costo e latenza.
+3. Ripeti ciò che conta; il modello non ha memoria fuori dalla trascrizione.
+4. Non determinismo di hardware/kernel, batching, cambi del provider.
+5. System prompt, file di istruzioni, schemi degli strumenti.
 </details>

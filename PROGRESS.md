@@ -1,50 +1,50 @@
-# Progress
+# Progressi
 
-Tick as you go. A module counts as done when you have read it, run the lab, and
-answered the checkpoint questions without looking.
+Spunta man mano che procedi. Un modulo è fatto quando l'hai letto, hai eseguito il laboratorio e
+hai risposto alle domande della verifica senza guardare.
 
-## Part I — Foundations
+## Parte I — Fondamenta
 
-- [ ] 00 Orientation
-- [ ] 01 LLMs, tokens, context
-- [ ] 02 The agent loop
-- [ ] 03 Tools & function calling
+- [ ] 00 Orientamento
+- [ ] 01 LLM, token, contesto
+- [ ] 02 Il ciclo dell'agente
+- [ ] 03 Strumenti e function calling
 
-## Part II — The machinery
+## Parte II — Il macchinario
 
-- [ ] 04 The filesystem as the world
-- [ ] 05 Context engineering
-- [ ] 06 Instructions & rules files
-- [ ] 07 Skills
-- [ ] 08 Hooks & lifecycle events
+- [ ] 04 Il filesystem come mondo
+- [ ] 05 Ingegneria del contesto
+- [ ] 06 Istruzioni e file di regole
+- [ ] 07 Skill
+- [ ] 08 Hook ed eventi del ciclo di vita
 
-## Part III — Scale and safety
+## Parte III — Scala e sicurezza
 
-- [ ] 09 Subagents & orchestration
-- [ ] 10 MCP & interoperability
-- [ ] 11 Verification & evals
-- [ ] 12 Safety, permissions, sandboxing
+- [ ] 09 Subagenti e orchestrazione
+- [ ] 10 MCP e interoperabilità
+- [ ] 11 Verifica ed eval
+- [ ] 12 Sicurezza, permessi, sandboxing
 
-## Part IV — Practice
+## Parte IV — Pratica
 
-- [ ] 13 Workflows that work
-- [ ] 14 Teams, CI, measurement
+- [ ] 13 Flussi di lavoro che funzionano
+- [ ] 14 Team, CI, misurazione
 - [ ] 15 Capstone
 
-## Capstone milestones
+## Traguardi del capstone
 
-- [ ] Chose a project and wrote the brief
-- [ ] Wrote the eval suite *before* the agent
-- [ ] Built the tool surface
-- [ ] Added a skill
-- [ ] Added a blocking hook
-- [ ] Split work across subagents
-- [ ] Passed evals
-- [ ] Wrote the retro
+- [ ] Ho scelto un progetto e scritto il brief
+- [ ] Ho scritto la suite di eval *prima* dell'agente
+- [ ] Ho costruito la superficie degli strumenti
+- [ ] Ho aggiunto una skill
+- [ ] Ho aggiunto un hook bloccante
+- [ ] Ho diviso il lavoro tra subagenti
+- [ ] Ho passato le eval
+- [ ] Ho scritto la retrospettiva
 
-## Notes
+## Note
 
-Use this space for your own observations — the questions you had, the things
-that surprised you, the failure you spent an hour on.
+Usa questo spazio per le tue osservazioni — le domande che avevi, le cose
+che ti hanno sorpreso, il fallimento su cui hai perso un'ora.
 
 -

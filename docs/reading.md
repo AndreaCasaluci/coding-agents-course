@@ -1,58 +1,58 @@
-# Reading list
+# Lista di letture
 
-Canonical sources, in rough order of usefulness. Links are to primary material;
-blog posts are included only where they named a problem better than the paper.
+Fonti canoniche, in ordine approssimativo di utilità. I link puntano al materiale primario;
+i post di blog sono inclusi solo dove hanno nominato un problema meglio del paper.
 
-## Protocols and conventions
+## Protocolli e convenzioni
 
 - **Model Context Protocol** — <https://modelcontextprotocol.io>
-  The spec and the primitive model (tools / resources / prompts).
+  La specifica e il modello primitivo (strumenti / risorse / prompt).
 - **AGENTS.md** — <https://agents.md>
-  The cross-vendor instruction-file convention.
+  La convenzione cross-vendor per il file di istruzioni.
 - **JSON-RPC 2.0** — <https://www.jsonrpc.org/specification>
-  Short, and you will need it to read MCP traces.
+  Breve, e ti servirà per leggere le tracce MCP.
 
-## Agents
+## Agenti
 
 - **ReAct: Synergizing Reasoning and Acting in Language Models** (Yao et al.,
   2022) — <https://arxiv.org/abs/2210.03629>
-  Where the reason/act/observe loop comes from.
+  Da dove viene il ciclo ragiona/agisci/osserva.
 - **Building Effective Agents** (Anthropic) —
   <https://www.anthropic.com/research/building-effective-agents>
-  Workflows vs agents, and why the simplest thing that works usually wins.
+  Flussi di lavoro contro agenti, e perché la cosa più semplice che funziona di solito vince.
 - **Lost in the Middle** (Liu et al., 2023) — <https://arxiv.org/abs/2307.03172>
-  The empirical basis for "context rot".
+  La base empirica del "degrado del contesto".
 
-## Security
+## Sicurezza
 
 - **OWASP Top 10 for LLM Applications** —
   <https://owasp.org/www-project-top-10-for-large-language-model-applications/>
-  Prompt injection, excessive agency, supply chain.
+  Prompt injection, agenzia eccessiva, supply chain.
 - **Simon Willison's prompt injection tag** —
   <https://simonwillison.net/tags/prompt-injection/>
-  The best running record of what actually breaks, and why prompts do not fix it.
-- **The lethal trifecta** (private data + untrusted content + external
-  communication) — the mental model for exfiltration risk.
+  Il miglior registro continuo di cosa si rompe davvero, e perché i prompt non lo risolvono.
+- **The lethal trifecta** (dati privati + contenuto non fidato + comunicazione
+  esterna) — il modello mentale per il rischio di esfiltrazione.
 
-## Evaluation
+## Valutazione
 
-- **pass@k** — the HumanEval paper (Chen et al., 2021) introduced the metric;
-  the idea generalises to any non-deterministic agent.
+- **pass@k** — il paper HumanEval (Chen et al., 2021) ha introdotto la metrica;
+  l'idea si generalizza a qualunque agente non deterministico.
 - **SWE-bench** — <https://www.swebench.com>
-  The reference benchmark for repo-level coding agents; read the task format
-  even if you never run it.
-- **Your own incident log** — the highest-value eval suite you will ever have.
+  Il benchmark di riferimento per gli agenti di coding a livello di repo; leggi il formato del task
+  anche se non lo eseguirai mai.
+- **Il tuo registro degli incidenti** — la suite di eval di maggior valore che avrai mai.
 
-## Practice
+## Pratica
 
 - **Google's "Code Review" guide** —
   <https://google.github.io/eng-practices/review/>
-  Written for humans, applies directly to reviewing agent diffs.
+  Scritta per umani, si applica direttamente alla revisione dei diff degli agenti.
 - **Git worktrees** — <https://git-scm.com/docs/git-worktree>
-  The cheapest isolation primitive for parallel agents.
+  La primitiva di isolamento più economica per agenti paralleli.
 
-## A note on staleness
+## Una nota sull'obsolescenza
 
-Product documentation changes monthly; the concepts above do not. If a lesson
-and a vendor doc disagree about *configuration*, trust the vendor. If they
-disagree about *mechanism*, trust the mechanism — and check the trace.
+La documentazione dei prodotti cambia ogni mese; i concetti qui sopra no. Se una lezione
+e la documentazione di un vendor sono in disaccordo sulla *configurazione*, fidati del vendor. Se sono
+in disaccordo sul *meccanismo*, fidati del meccanismo — e controlla la traccia.

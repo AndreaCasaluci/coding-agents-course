@@ -1,9 +1,9 @@
-"""Lab 13 — Workflows: one-shot vs explore-plan-execute-verify.
+"""Laboratorio 13 — Flussi di lavoro: one-shot vs esplora-pianifica-esegui-verifica.
 
-Run: python3 labs/L13_workflows.py
+Esegui: python3 labs/L13_workflows.py
 
-Goal: run the same bug fix two ways and compare the diff, the turns, and the
-evidence.
+Obiettivo: eseguire la stessa correzione in due modi e confrontare il diff, i
+turni e le prove.
 """
 
 from __future__ import annotations
@@ -28,8 +28,8 @@ def helper():
 
 def main() -> None:
     section("SETUP")
-    note("Bug: parse_date('') raises a confusing ValueError from strptime.")
-    note("Spec: it should raise ValueError('empty date'), and helper() must survive.")
+    note("Bug: parse_date('') solleva un ValueError poco chiaro da strptime.")
+    note("Specifica: deve sollevare ValueError('data vuota'), e helper() deve sopravvivere.")
 
     with temp_ws("workflow") as tmp:
         ws = Workspace(tmp)
@@ -37,83 +37,83 @@ def main() -> None:
 
         @tool
         def run_tests() -> str:
-            """Run the test suite."""
+            """Esegue la suite di test."""
             content = ws.read("src/dates.py")
             if "if not s" not in content:
-                return "FAILED tests/test_dates.py::test_empty_string\n  expected ValueError('empty date')"
+                return "FALLITO tests/test_dates.py::test_empty_string\n  atteso ValueError('data vuota')"
             if "def helper" not in content:
-                return "FAILED tests/test_dates.py::test_helper\n  helper() is missing"
-            return "2 passed in 0.01s"
+                return "FALLITO tests/test_dates.py::test_helper\n  helper() è sparito"
+            return "2 passati in 0,01s"
 
         tools = make_fs_tools(ws) + [run_tests]
 
-        section("1. ONE-SHOT: 'fix it'")
-        # The model rewrites the whole file from its first guess. It never
-        # reads the file, so it does not know helper() exists.
+        section("1. ONE-SHOT: 'correggi'")
+        # Il modello riscrive tutto il file dalla prima ipotesi. Non ha mai
+        # letto il file, quindi non sa che esiste helper().
         oneshot = ScriptedLLM(
-            Message("assistant", "Rewriting the function.", [
+            Message("assistant", "Riscrivo la funzione.", [
                 ToolCall("c1", "write_file", {
                     "path": "src/dates.py",
-                    "content": 'from datetime import datetime\n\nFMT = "%Y-%m-%d"\n\ndef parse_date(s):\n    if not s:\n        raise ValueError("empty date")\n    return datetime.strptime(s, FMT)\n',
+                    "content": 'from datetime import datetime\n\nFMT = "%Y-%m-%d"\n\ndef parse_date(s):\n    if not s:\n        raise ValueError("data vuota")\n    return datetime.strptime(s, FMT)\n',
                 })
             ]),
-            "Fixed parse_date.",
+            "Corretto parse_date.",
         )
         before = ws.read("src/dates.py")
-        result = Agent(oneshot, tools, workspace=ws, max_turns=6).run("fix the empty-date bug")
+        result = Agent(oneshot, tools, workspace=ws, max_turns=6).run("correggi il bug della data vuota")
         after = ws.read("src/dates.py")
-        print(f"  turns={result.turns} calls={result.tool_calls}")
-        print(f"  tests run by the agent? {'run_tests' in result.tool_calls}")
-        print(f"  helper() preserved? {'def helper' in after}")
-        print(f"  lines: {len(before.splitlines())} -> {len(after.splitlines())}")
-        print(f"  verdict: {result.final}")
+        print(f"  turni={result.turns} chiamate={result.tool_calls}")
+        print(f"  test eseguiti dall'agente? {'run_tests' in result.tool_calls}")
+        print(f"  helper() preservato? {'def helper' in after}")
+        print(f"  righe: {len(before.splitlines())} -> {len(after.splitlines())}")
+        print(f"  verdetto: {result.final}")
 
-        section("2. STRUCTURED: explore -> plan -> test -> fix -> verify")
+        section("2. STRUTTURATO: esplora -> pianifica -> test -> correggi -> verifica")
         ws.write("src/dates.py", ORIGINAL)
         structured = ScriptedLLM(
-            Message("assistant", "Locating the function first.", [
+            Message("assistant", "Prima localizzo la funzione.", [
                 ToolCall("c1", "search", {"pattern": "def parse_date"})
             ]),
-            Message("assistant", "Reading the whole file to see what else is there.", [
+            Message("assistant", "Leggo tutto il file per vedere cos'altro c'è.", [
                 ToolCall("c2", "read_file", {"path": "src/dates.py"})
             ]),
-            Message("assistant", "Plan: add a guard at the top of parse_date. helper() is unrelated; leave it.", [
+            Message("assistant", "Piano: aggiungo un controllo in cima a parse_date. helper() è indipendente; lo lascio.", [
                 ToolCall("c3", "edit_file", {
                     "path": "src/dates.py",
                     "old": "def parse_date(s):\n    return datetime.strptime(s, FMT)",
-                    "new": "def parse_date(s):\n    if not s:\n        raise ValueError(\"empty date\")\n    return datetime.strptime(s, FMT)",
+                    "new": "def parse_date(s):\n    if not s:\n        raise ValueError(\"data vuota\")\n    return datetime.strptime(s, FMT)",
                 })
             ]),
-            Message("assistant", "Verifying.", [ToolCall("c4", "run_tests", {})]),
-            "Added an empty-string guard; tests pass; helper() untouched.",
+            Message("assistant", "Verifico.", [ToolCall("c4", "run_tests", {})]),
+            "Aggiunto il controllo per la stringa vuota; i test passano; helper() intatto.",
         )
         before = ws.read("src/dates.py")
-        result = Agent(structured, tools, workspace=ws, max_turns=8).run("fix the empty-date bug")
+        result = Agent(structured, tools, workspace=ws, max_turns=8).run("correggi il bug della data vuota")
         after = ws.read("src/dates.py")
-        print(f"  turns={result.turns} calls={result.tool_calls}")
-        print(f"  tests run by the agent? {'run_tests' in result.tool_calls}")
-        print(f"  helper() preserved? {'def helper' in after}")
-        print(f"  lines: {len(before.splitlines())} -> {len(after.splitlines())}")
-        print(f"  verdict: {result.final}")
+        print(f"  turni={result.turns} chiamate={result.tool_calls}")
+        print(f"  test eseguiti dall'agente? {'run_tests' in result.tool_calls}")
+        print(f"  helper() preservato? {'def helper' in after}")
+        print(f"  righe: {len(before.splitlines())} -> {len(after.splitlines())}")
+        print(f"  verdetto: {result.final}")
 
-        section("3. COMPARE")
-        note("Same task, same tools, same model. Different workflow.")
-        note("One-shot: fewer turns, no evidence, silent data loss.")
-        note("Structured: 2 extra turns, a plan, a test run, and a verifiable result.")
-        note("The extra turns are cheaper than the review cycle they prevent.")
+        section("3. CONFRONTO")
+        note("Stesso compito, stessi strumenti, stesso modello. Flusso diverso.")
+        note("One-shot: meno turni, nessuna prova, perdita di dati silenziosa.")
+        note("Strutturato: 2 turni in più, un piano, un'esecuzione dei test e un risultato verificabile.")
+        note("I turni in più costano meno del ciclo di revisione che prevengono.")
 
-        section("4. THE SESSION SHAPE")
-        note("1. EXPLORE  read-only, cheap, catches misunderstanding")
-        note("2. PLAN     state the change and the files, no edits")
-        note("3. EXECUTE  small edits, one concern")
-        note("4. VERIFY   tests, types, diff")
-        note("5. REPORT   what changed, what is unproven")
+        section("4. LA FORMA DELLA SESSIONE")
+        note("1. ESPLORA   sola lettura, economico, cattura gli equivoci")
+        note("2. PIANIFICA enuncia la modifica e i file, nessuna modifica")
+        note("3. ESEGUI    modifiche piccole, una sola questione")
+        note("4. VERIFICA  test, tipi, diff")
+        note("5. RIPORTA   cosa è cambiato, cosa non è provato")
 
-        section("5. WHEN TO TAKE OVER")
-        note("Same failed attempt twice -> it will make it a third time.")
-        note("Diff growing while tests stay red -> stop.")
-        note("Edits outside the stated scope -> stop.")
-        note("You cannot explain the change -> stop.")
+        section("5. QUANDO PRENDERE IL CONTROLLO")
+        note("Stesso tentativo fallito due volte -> lo farà una terza.")
+        note("Diff che cresce mentre i test restano rossi -> fermati.")
+        note("Modifiche fuori dal perimetro dichiarato -> fermati.")
+        note("Non riesci a spiegare la modifica -> fermati.")
 
     _ = ORIGINAL
 

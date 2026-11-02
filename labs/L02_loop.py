@@ -1,8 +1,9 @@
-"""Lab 02 — The loop: termination, recovery, and denial.
+"""Laboratorio 02 — Il ciclo: terminazione, recupero e rifiuto.
 
-Run: python3 labs/L02_loop.py
+Esegui: python3 labs/L02_loop.py
 
-Four scenarios, each a full run. Read the transcript, not just the summary.
+Quattro scenari, ognuno un'esecuzione completa. Leggi la trascrizione, non solo
+il riassunto.
 """
 
 from _helpers import note, section, temp_ws
@@ -15,7 +16,7 @@ from mini_agent.llm import PolicyLLM, ScriptedLLM
 def show(result) -> None:
     for message in result.messages[1:]:
         print("   " + message.text().replace("\n", "\n   ")[:400])
-    note(f"stopped={result.stopped_reason} turns={result.turns} calls={result.tool_calls}")
+    note(f"stop={result.stopped_reason} turni={result.turns} chiamate={result.tool_calls}")
 
 
 def main() -> None:
@@ -24,45 +25,45 @@ def main() -> None:
         ws.write("app.py", "def add(a, b):\n    return a + b\n")
         tools = make_fs_tools(ws)
 
-        section("SCENARIO 1 — clean two-turn task")
+        section("SCENARIO 1 — compito pulito in due turni")
         llm = ScriptedLLM(
-            Message("assistant", "Reading the file first.", [ToolCall("c1", "read_file", {"path": "app.py"})]),
-            "The function is correct.",
+            Message("assistant", "Leggo prima il file.", [ToolCall("c1", "read_file", {"path": "app.py"})]),
+            "La funzione è corretta.",
         )
-        show(Agent(llm, tools, workspace=ws, max_turns=5).run("Check app.py"))
+        show(Agent(llm, tools, workspace=ws, max_turns=5).run("Controlla app.py"))
 
-        section("SCENARIO 2 — tool error, model recovers")
+        section("SCENARIO 2 — errore di uno strumento, il modello si riprende")
         llm = ScriptedLLM(
-            Message("assistant", "Reading the test.", [ToolCall("c1", "read_file", {"path": "test_app.py"})]),
-            Message("assistant", "No test file. Let me list instead.", [ToolCall("c2", "list_files", {"path": "."})]),
-            "There is no test file; app.py only.",
+            Message("assistant", "Leggo il test.", [ToolCall("c1", "read_file", {"path": "test_app.py"})]),
+            Message("assistant", "Nessun file di test. Elenco invece.", [ToolCall("c2", "list_files", {"path": "."})]),
+            "Non c'è un file di test; solo app.py.",
         )
-        show(Agent(llm, tools, workspace=ws, max_turns=6).run("Read test_app.py"))
+        show(Agent(llm, tools, workspace=ws, max_turns=6).run("Leggi test_app.py"))
 
-        section("SCENARIO 3 — a model that never stops")
-        # This policy always calls a tool, like a model stuck retrying.
+        section("SCENARIO 3 — un modello che non si ferma mai")
+        # Questa policy chiama sempre uno strumento, come un modello in retry.
         def stuck(messages, schemas):
-            return Message("assistant", "Trying again.", [ToolCall("x", "list_files", {"path": "."})])
+            return Message("assistant", "Riprovo.", [ToolCall("x", "list_files", {"path": "."})])
 
-        result = Agent(PolicyLLM(stuck), tools, workspace=ws, max_turns=4).run("loop")
+        result = Agent(PolicyLLM(stuck), tools, workspace=ws, max_turns=4).run("ciclo")
         show(result)
-        note("Without max_turns this would run until the bill arrives.")
+        note("Senza max_turns questo girerebbe fino all'arrivo della fattura.")
 
-        section("SCENARIO 4 — a hook denies an action")
+        section("SCENARIO 4 — un hook nega un'azione")
         hooks = HookBus()
-        hooks.on(PRE_TOOL, lambda p: HookResult(False, "writes disabled in this session"), name="no-writes")
+        hooks.on(PRE_TOOL, lambda p: HookResult(False, "scritture disabilitate in questa sessione"), name="no-writes")
         llm = ScriptedLLM(
-            Message("assistant", "Writing a file.", [ToolCall("c1", "write_file", {"path": "new.py", "content": "x"})]),
-            "Understood — I cannot write here.",
+            Message("assistant", "Scrivo un file.", [ToolCall("c1", "write_file", {"path": "new.py", "content": "x"})]),
+            "Capito — qui non posso scrivere.",
         )
-        result = Agent(llm, tools, workspace=ws, hooks=hooks, max_turns=5).run("create new.py")
+        result = Agent(llm, tools, workspace=ws, hooks=hooks, max_turns=5).run("crea new.py")
         show(result)
-        note("The denial is a message, not a crash. The model can choose another path.")
+        note("Il rifiuto è un messaggio, non un crash. Il modello può scegliere un'altra strada.")
 
-        section("WHAT TO NOTICE")
-        note("A run is complete only when a reply has no tool calls.")
-        note("Tool failures and denials both re-enter the loop as text.")
-        note("max_turns is the difference between a bad session and an expensive one.")
+        section("COSA NOTARE")
+        note("Un'esecuzione è completa solo quando una risposta non ha chiamate agli strumenti.")
+        note("Errori degli strumenti e rifiuti rientrano nel ciclo come testo.")
+        note("max_turns è la differenza tra una sessione brutta e una costosa.")
 
 
 if __name__ == "__main__":

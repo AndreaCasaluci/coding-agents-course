@@ -1,60 +1,60 @@
-# 08 — Hooks & Lifecycle Events
+# 08 — Hook ed eventi del ciclo di vita
 
-> **Objectives**
-> - Explain why some behaviour must not live in a prompt.
-> - Implement observe / block / mutate hooks.
-> - Layer hooks, permissions, and sandboxes correctly.
+> **Obiettivi**
+> - Spiegare perché alcuni comportamenti non possono vivere in un prompt.
+> - Implementare hook di osservazione, blocco e modifica.
+> - Stratificare correttamente hook, permessi e sandbox.
 
-## Prompts are suggestions. Hooks are rules.
+## I prompt sono suggerimenti. Gli hook sono regole.
 
-You can write "never edit `.env`" in `AGENTS.md`. The model will usually
-comply. Usually is not a security property.
+Puoi scrivere "non modificare mai `.env`" in `AGENTS.md`. Il modello di solito
+ubbidirà. "Di solito" non è una proprietà di sicurezza.
 
-A hook is **code bound to an event**. It runs every time, in a deterministic
-order, and its verdict is enforced by the harness:
+Un hook è **codice legato a un evento**. Gira ogni volta, in un ordine
+deterministico, e il suo verdetto è imposto dall'harness:
 
 ```python
 hooks.on(PRE_EDIT, deny_paths((".env", ".git", "secrets")))
 ```
 
-That is not a suggestion. It is a branch in the harness's control flow.
+Non è un suggerimento. È un ramo nel flusso di controllo dell'harness.
 
-The design principle:
+Il principio di progetto:
 
-> If violating the rule is unacceptable, it must not depend on the model's
-> cooperation.
+> Se violare la regola è inaccettabile, non deve dipendere dalla cooperazione del
+> modello.
 
-## The event surface
+## La superficie degli eventi
 
-| Event | When | Typical use |
+| Evento | Quando | Uso tipico |
 |---|---|---|
-| `session_start` | before the first model call | load context, print a banner |
-| `user_prompt` | task text, before it enters the transcript | rewrite, redact, reject |
-| `pre_tool` | before any tool runs | block, rewrite arguments, approve |
-| `post_tool` | after any tool runs | redact secrets, truncate, log |
-| `pre_edit` | before a write/edit/delete | protect paths, enforce style |
-| `post_edit` | after a successful write/edit | format, typecheck, stage |
-| `session_end` | after the loop finishes | summary, metrics, cleanup |
+| `session_start` | prima della prima chiamata al modello | caricare contesto, banner |
+| `user_prompt` | testo del compito, prima di entrare in trascrizione | riscrivere, oscurare, rifiutare |
+| `pre_tool` | prima che giri qualsiasi strumento | bloccare, riscrivere argomenti, approvare |
+| `post_tool` | dopo qualsiasi strumento | oscurare segreti, troncare, loggare |
+| `pre_edit` | prima di scrittura/modifica/cancellazione | proteggere percorsi, imporre stile |
+| `post_edit` | dopo una scrittura/modifica riuscita | formattare, typecheck, stage |
+| `session_end` | dopo la fine del ciclo | riassunto, metriche, pulizia |
 
-`pre_*` events are **gates**. `post_*` events are **filters and side effects**.
-Confusing the two produces hooks that cannot prevent anything.
+Gli eventi `pre_*` sono **cancelli**. Gli eventi `post_*` sono **filtri ed
+effetti collaterali**. Confonderli produce hook che non possono impedire nulla.
 
-## Three verbs
+## Tre verbi
 
-### Observe
+### Osservare
 
 ```python
 def audit(handle):
     def hook(payload):
         handle.write(json.dumps(payload) + "\n")
-        return None          # None = abstain
+        return None          # None = astensione
     return hook
 ```
 
-Cheap, boring, invaluable. When an agent does something strange, the audit log
-tells you what it actually called.
+Economico, noioso, inestimabile. Quando un agente fa qualcosa di strano, il log
+di audit ti dice cosa ha davvero chiamato.
 
-### Block
+### Bloccare
 
 ```python
 def deny_paths(prefixes):
@@ -66,10 +66,10 @@ def deny_paths(prefixes):
     return hook
 ```
 
-The denial becomes a `DENIED: …` tool message. The model sees it and can choose
-another path. Blocking is not crashing.
+Il rifiuto diventa un messaggio `DENIED: …`. Il modello lo vede e può scegliere
+un'altra strada. Bloccare non significa far cadere tutto.
 
-### Mutate
+### Modificare
 
 ```python
 def redact(payload):
@@ -79,12 +79,12 @@ def redact(payload):
     return None
 ```
 
-Mutation is powerful and dangerous. Rewriting a tool's *arguments* changes what
-the model asked for; rewriting its *result* changes what it believes happened.
-Prefer blocking over silently rewriting — the model can reason about "denied",
-but not about a lie.
+La modifica è potente e pericolosa. Riscrivere gli *argomenti* di uno strumento
+cambia ciò che il modello ha chiesto; riscriverne il *risultato* cambia ciò che
+crede sia successo. Preferisci bloccare piuttosto che riscrivere in silenzio — il
+modello può ragionare su "negato", non su una bugia.
 
-## Fail closed
+## Fallire chiusi
 
 ```python
 try:
@@ -93,55 +93,57 @@ except Exception as exc:
     return HookResult(False, f"hook raised {exc}")
 ```
 
-If a safety hook crashes, the safe default is *deny*. The harness here does
-this. Note the trade-off: a buggy hook can halt all work. That is usually the
-right trade for a guard, and the wrong one for a formatter — so keep formatting
-in `post_edit` where a failure cannot block a write.
+Se un hook di sicurezza va in crash, il default sicuro è *negare*. L'harness qui
+lo fa. Nota il compromesso: un hook difettoso può fermare tutto il lavoro. Di
+solito è il compromesso giusto per un guardrail, e quello sbagliato per un
+formatter — quindi tieni la formattazione in `post_edit`, dove un fallimento non
+può bloccare una scrittura.
 
-## Hooks you will actually write
+## Hook che scriverai davvero
 
-| Hook | Event | Effect |
+| Hook | Evento | Effetto |
 |---|---|---|
-| Protect `.env`, `.git`, `secrets/` | `pre_edit` | block |
-| Redact API keys from tool output | `post_tool` | mutate |
-| Auto-format after edit | `post_edit` | side effect |
-| Run typecheck after edit | `post_edit` | side effect; surface errors |
-| Require approval for `git push` | `pre_tool` | block until human says yes |
-| Block `rm -rf`, `--force`, `DROP TABLE` | `pre_tool` | block |
-| Append every call to a JSONL log | `pre_tool` | observe |
-| Enforce a max diff size | `pre_edit` | block |
-| Add a co-author trailer on commit | `post_edit` | mutate |
+| Proteggi `.env`, `.git`, `secrets/` | `pre_edit` | blocca |
+| Oscura chiavi API nell'output | `post_tool` | modifica |
+| Auto-formatta dopo la modifica | `post_edit` | effetto collaterale |
+| Esegui il typecheck dopo la modifica | `post_edit` | effetto collaterale; mostra errori |
+| Richiedi approvazione per `git push` | `pre_tool` | blocca finché un umano approva |
+| Blocca `rm -rf`, `--force`, `DROP TABLE` | `pre_tool` | blocca |
+| Accoda ogni chiamata a un log JSONL | `pre_tool` | osserva |
+| Impedisci diff oltre una dimensione | `pre_edit` | blocca |
+| Aggiungi un trailer di co-autore al commit | `post_edit` | modifica |
 
-## Hooks vs permissions vs sandboxes
+## Hook, permessi e sandbox
 
-These are three layers of the same defence, at increasing strength:
+Sono tre livelli della stessa difesa, con forza crescente:
 
 ```
 ┌─────────────────────────────────────────────┐
-│ instruction   "please don't"      weakest   │
+│ istruzione    "per favore non farlo"  debole│
 ├─────────────────────────────────────────────┤
-│ hook          deterministic policy          │
+│ hook          politica deterministica       │
 ├─────────────────────────────────────────────┤
-│ permission    allowlist / approval / modes  │
+│ permesso      allowlist / approvazione / modi│
 ├─────────────────────────────────────────────┤
-│ sandbox       OS/container enforcement      │  strongest
+│ sandbox       imposizione a livello OS      │  più forte
 └─────────────────────────────────────────────┘
 ```
 
-- A **hook** sees structured events and can reason about intent ("is this path
-  protected?", "does this command contain `--force`?"). It runs in-process, so
-  a compromised agent process can bypass it.
-- A **permission system** decides whether a *class* of action is allowed at
-  all: read-only mode, allowlisted commands, per-tool approval.
-- A **sandbox** enforces at the OS level: no network, read-only mounts, a
-  container with no host access. It holds even if the agent is fully hostile.
+- Un **hook** vede eventi strutturati e può ragionare sull'intento ("questo
+  percorso è protetto?", "questo comando contiene `--force`?"). Gira
+  in-process, quindi un processo agente compromesso può aggirarlo.
+- Un **sistema di permessi** decide se una *classe* di azione è consentita:
+  modalità sola lettura, comandi in allowlist, approvazione per strumento.
+- Una **sandbox** impone a livello di sistema operativo: niente rete, mount in
+  sola lettura, un container senza accesso all'host. Regge anche se l'agente è
+  completamente ostile.
 
-Use all three. Hooks for policy and observability, permissions for coarse
-capability, sandboxes for blast radius.
+Usa tutti e tre. Hook per politica e osservabilità, permessi per capacità
+grossolane, sandbox per il raggio d'impatto.
 
-## Testing hooks
+## Testare gli hook
 
-Hooks are code, so test them like code:
+Gli hook sono codice, quindi testali come codice:
 
 ```python
 def test_deny_env():
@@ -150,43 +152,44 @@ def test_deny_env():
     assert hook({"path": "src/app.py"}) is None
 ```
 
-Two properties worth asserting for every guard:
+Due proprietà da verificare per ogni guardrail:
 
-1. It denies what it should.
-2. It **abstains** on everything else — a guard that returns `HookResult(True)`
-   for unrelated payloads will silently swallow payload mutations from other
-   hooks.
+1. Nega ciò che deve negare.
+2. Si **astiene** su tutto il resto — un guardrail che restituisce
+   `HookResult(True)` per payload non correlati ingoierà in silenzio le modifiche
+   di altri hook.
 
-## Lab
+## Laboratorio
 
 ```bash
 python3 labs/L08_hooks.py
 ```
 
-You will build a bus with an audit hook, a path guard, and a secret redactor,
-then watch a write to `.env` get denied, a key get scrubbed from output, and a
-crashing hook fail closed.
+Costruirai un bus con un hook di audit, un guardrail sui percorsi e un oscuratore
+di segreti, poi vedrai una scrittura su `.env` negata, una chiave ripulita
+dall'output e un hook che va in crash fallire chiuso.
 
-🔬 **Break it:** make the guard return `HookResult(True)` instead of `None` for
-unrelated paths and watch a later mutation get discarded.
+🔬 **Fallo fallire:** fai restituire al guardrail `HookResult(True)` invece di
+`None` per percorsi non correlati e guarda una modifica successiva venire
+scartata.
 
-## ✅ Checkpoint
+## ✅ Verifica
 
-1. Why can't "never edit `.env`" live only in `AGENTS.md`?
-2. What is the difference between `pre_*` and `post_*` events?
-3. Why prefer blocking over silently rewriting a result?
-4. Why should a guard hook fail closed, but a formatter hook need not?
-5. What does a sandbox add that a hook cannot?
+1. Perché "non modificare mai `.env`" non può vivere solo in `AGENTS.md`?
+2. Qual è la differenza tra eventi `pre_*` e `post_*`?
+3. Perché preferire il blocco alla riscrittura silenziosa di un risultato?
+4. Perché un guardrail deve fallire chiuso, mentre un formatter no?
+5. Cosa aggiunge una sandbox che un hook non può dare?
 
 <details>
-<summary>Answers</summary>
+<summary>Risposte</summary>
 
-1. Prompts are probabilistic; hooks are enforced control flow.
-2. `pre_*` can prevent; `post_*` can only filter or react.
-3. The model can reason about "denied"; a silent rewrite gives it a false
-   picture of the world.
-4. A broken guard must not open the gate; a broken formatter just skips
-   formatting.
-5. Enforcement outside the agent process, which survives a compromised or
-   hostile agent.
+1. I prompt sono probabilistici; gli hook sono flusso di controllo imposto.
+2. I `pre_*` possono impedire; i `post_*` possono solo filtrare o reagire.
+3. Il modello può ragionare su "negato"; una riscrittura silenziosa gli dà una
+   falsa immagine del mondo.
+4. Un guardrail rotto non deve aprire il cancello; un formatter rotto salta solo
+   la formattazione.
+5. L'imposizione fuori dal processo dell'agente, che sopravvive a un agente
+   compromesso o ostile.
 </details>

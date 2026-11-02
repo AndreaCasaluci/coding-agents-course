@@ -50,7 +50,7 @@ class Tool:
             value = self.fn(**arguments)
             return ToolResult(ok=True, content=value if isinstance(value, str) else json.dumps(value, indent=2, default=str))
         except TypeError as exc:
-            return ToolResult(ok=False, content=f"Invalid arguments for {self.name}: {exc}")
+            return ToolResult(ok=False, content=f"Argomenti non validi per {self.name}: {exc}")
         except Exception as exc:  # tool failures must not kill the loop
             return ToolResult(ok=False, content=f"{type(exc).__name__}: {exc}")
 
@@ -154,7 +154,7 @@ class ToolRegistry:
     def dispatch(self, name: str, arguments: dict[str, Any]) -> ToolResult:
         t = self.get(name)
         if t is None:
-            return ToolResult(ok=False, content=f"Unknown tool `{name}`. Available: {', '.join(self._tools)}")
+            return ToolResult(ok=False, content=f"Strumento sconosciuto: `{name}`. Disponibili: {', '.join(self._tools)}")
         if "__parse_error__" in arguments:
-            return ToolResult(ok=False, content=f"Could not parse arguments for `{name}`: {arguments['__parse_error__']!r}")
+            return ToolResult(ok=False, content=f"Impossibile analizzare gli argomenti di `{name}`: {arguments['__parse_error__']!r}")
         return t.run(arguments)

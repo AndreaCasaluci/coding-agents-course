@@ -1,18 +1,18 @@
-"""repo_doctor — the capstone agent.
+"""repo_doctor — l'agente del progetto finale.
 
-It audits a repository and writes REPORT.md. Every concept from the course
-appears exactly once, on purpose:
+Analizza una repository e scrive REPORT.md. Ogni concetto del corso compare
+esattamente una volta, di proposito:
 
-    tools       inventory, search, read_file, write_file, delegate
-    skill       capstone/skills/repo-audit/SKILL.md (loaded via load_skill)
-    hook        only REPORT.md is writable (deterministic, not a prompt)
-    subagent    the security scan runs in a fresh context
-    budget      ContextBudget + max_turns
-    evals       capstone/evals.py
+    strumenti  inventario, search, read_file, write_file, delegate
+    skill      capstone/skills/repo-audit/SKILL.md (via load_skill)
+    hook       solo REPORT.md è scrivibile (deterministico, non un prompt)
+    subagente  la scansione di sicurezza gira in un contesto pulito
+    budget     ContextBudget + max_turns
+    eval       capstone/evals.py
 
-Run:
+Esegui:
     python3 -m capstone.repo_doctor --demo
-    python3 -m capstone.repo_doctor --root /path/to/repo
+    python3 -m capstone.repo_doctor --root /percorso/della/repo
     python3 -m capstone.repo_doctor --eval
 """
 
@@ -48,22 +48,22 @@ from mini_agent.llm import LLM, ScriptedLLM, default_llm
 SKILLS_DIR = Path(__file__).resolve().parent / "skills"
 REPORT_NAME = "REPORT.md"
 REQUIRED_SECTIONS = (
-    "## Summary",
-    "## Untested modules",
-    "## TODO clusters",
-    "## Risky patterns",
-    "## Top 3 fixes",
+    "## Riepilogo",
+    "## Moduli senza test",
+    "## Cluster di TODO",
+    "## Pattern rischiosi",
+    "## Prime 3 correzioni",
 )
 TODO_PATTERN = r"TODO|FIXME|HACK"
 RISKY_PATTERN = r"eval\(|exec\(|shell\s*=\s*True|password\s*=\s*['\"]"
 
 AUDIT_TASK = (
-    "Audit this repository and write REPORT.md. "
-    "Follow the repo-audit skill. Do not modify any other file."
+    "Analizza questa repository e scrivi REPORT.md. "
+    "Segui la skill repo-audit. Non modificare nessun altro file."
 )
 SECURITY_TASK = (
-    "SECURITY SCAN: find eval(), exec(), shell=True, and hardcoded credentials. "
-    "Report file:line for each finding. Do not edit anything."
+    "SCANSIONE DI SICUREZZA: trova eval(), exec(), shell=True e credenziali "
+    "hardcoded. Riporta file:riga per ogni risultato. Non modificare nulla."
 )
 
 
@@ -92,7 +92,7 @@ def build_doctor(
 
     @tool(name="inventory")
     def inventory() -> str:
-        """List Python sources under src/ and tests under tests/, as JSON."""
+        """Elenca i sorgenti Python sotto src/ e i test sotto tests/, come JSON."""
         return _inventory(ws)
 
     holder: dict[str, Agent] = {}
@@ -101,12 +101,12 @@ def build_doctor(
 
     @tool(name="delegate")
     def delegate(task: str, name: str = "helper") -> str:
-        """Run a bounded subtask in a fresh context. Returns only a summary."""
+        """Esegue un sotto-compito delimitato in un contesto pulito. Restituisce solo un riassunto."""
         parent = holder.get("agent")
         if parent is None:
-            return "delegation unavailable"
+            return "delega non disponibile"
         if depth.get() > 0:
-            return "nested delegation is disabled"
+            return "la delega annidata è disabilitata"
         token = depth.set(depth.get() + 1)
         try:
             result = run_subagent(parent, name, task)
@@ -121,7 +121,7 @@ def build_doctor(
     hooks.on(
         PRE_EDIT,
         lambda p: None if p.get("path") == REPORT_NAME else HookResult(
-            False, f"audit mode: only {REPORT_NAME} may be written"
+            False, f"modalità analisi: solo {REPORT_NAME} è scrivibile"
         ),
         name="report-only",
     )
@@ -145,12 +145,13 @@ def build_doctor(
 
 # -- the offline model -----------------------------------------------------
 class DoctorLLM:
-    """A deterministic 'model' that performs the audit procedure.
+    """Un 'modello' deterministico che esegue la procedura di analisi.
 
-    It is not intelligent: it is a state machine over the transcript. That is
-    the point — it makes the capstone runnable offline and makes the harness
-    behaviour (hooks, tools, subagents) observable without an API key. Set
-    MINI_AGENT_PROVIDER=openai to swap in a real model.
+    Non è intelligente: è una macchina a stati sulla trascrizione. È proprio
+    questo il punto — rende il progetto finale eseguibile offline e rende
+    osservabile il comportamento dell'harness (hook, strumenti, subagenti)
+    senza chiave API. Imposta MINI_AGENT_PROVIDER=openai per usare un modello
+    vero.
     """
 
     def __init__(self) -> None:
@@ -162,20 +163,20 @@ class DoctorLLM:
         user_task = next((m.content for m in messages if m.role == "user"), "")
         calls = [c for m in messages if m.role == "assistant" for c in m.tool_calls]
         called = [c.name for c in calls]
-        is_security = user_task.startswith("SECURITY SCAN")
+        is_security = user_task.startswith("SCANSIONE DI SICUREZZA")
 
         if "load_skill" in available and "load_skill" not in called:
-            return Message("assistant", "Loading the audit procedure.", [
+            return Message("assistant", "Carico la procedura di analisi.", [
                 ToolCall(f"t{self.calls}", "load_skill", {"name": "repo-audit"})
             ])
         if "inventory" not in called:
-            return Message("assistant", "Inventorying the repo.", [
+            return Message("assistant", "Inventario della repo.", [
                 ToolCall(f"t{self.calls}", "inventory", {})
             ])
         searches = [c.arguments.get("pattern", "") for c in calls if c.name == "search"]
         if len(searches) < 2:
             pattern = TODO_PATTERN if not searches else RISKY_PATTERN
-            return Message("assistant", f"Searching for {pattern}.", [
+            return Message("assistant", f"Cerco {pattern}.", [
                 ToolCall(f"t{self.calls}", "search", {"pattern": pattern})
             ])
 
@@ -183,17 +184,17 @@ class DoctorLLM:
             return Message("assistant", _security_summary(messages))
 
         if "delegate" not in called:
-            return Message("assistant", "Delegating the security scan.", [
+            return Message("assistant", "Delego la scansione di sicurezza.", [
                 ToolCall(f"t{self.calls}", "delegate", {"name": "security", "task": SECURITY_TASK})
             ])
         if "write_file" not in called:
-            return Message("assistant", "Writing the report.", [
+            return Message("assistant", "Scrivo il report.", [
                 ToolCall(f"t{self.calls}", "write_file", {
                     "path": REPORT_NAME,
                     "content": _build_report(messages, user_task),
                 })
             ])
-        return Message("assistant", f"Audit complete. Wrote {REPORT_NAME}.")
+        return Message("assistant", f"Analisi completata. Ho scritto {REPORT_NAME}.")
 
 
 def _tool_output(messages, name: str) -> str:
@@ -224,12 +225,12 @@ def _security_summary(messages) -> str:
     results = _search_results(messages)
     risky = _parse_hits(results[-1] if len(results) > 1 else "")
     if not risky:
-        return "No security findings."
+        return "Nessun problema di sicurezza."
     lines = []
     for path, items in sorted(risky.items()):
         for lineno, snippet in items[:3]:
             lines.append(f"- {path}:{lineno}: {snippet[:80]}")
-    return "Security findings:\n" + "\n".join(lines)
+    return "Risultati di sicurezza:\n" + "\n".join(lines)
 
 
 def _build_report(messages, user_task: str) -> str:
@@ -244,79 +245,82 @@ def _build_report(messages, user_task: str) -> str:
     untested = [s for s in sources if Path(s).stem.lower() not in test_names]
 
     security = ""
-    marker = "Security scan findings:"
+    marker = "Risultati di sicurezza:"
     if marker in user_task:
         security = user_task.split(marker, 1)[1].strip()
 
     delegated = _tool_output(messages, "delegate")
     if delegated:
-        # Drop the tool wrapper line ("[subagent:security ok, 5 turns]").
+        # Togli la riga di wrapper dello strumento ("[subagent:security ok, 5 turns]").
         lines = delegated.splitlines()
         if lines and lines[0].startswith("[subagent:"):
             delegated = "\n".join(lines[1:]).strip()
-    # The child ran the same search as the parent. Only add its findings when
-    # the parent's own search found nothing — otherwise it is a duplicate.
-    if delegated and "No security findings" not in delegated and not risky_hits:
+    # Il figlio ha eseguito la stessa ricerca del padre. Aggiungi i suoi
+    # risultati solo quando la ricerca del padre non ha trovato nulla:
+    # altrimenti è un duplicato.
+    if delegated and "Nessun problema di sicurezza" not in delegated and not risky_hits:
         security = delegated
 
     issues = len(untested) + len(todo_hits) + len(risky_hits) + (1 if security else 0)
-    summary = "No major issues found." if issues == 0 else f"{issues} issue group(s) found."
+    summary = "Nessun problema rilevante." if issues == 0 else f"{issues} gruppi di problemi trovati."
 
-    def bullets(items: dict[str, list[tuple[int, str]]], suffix: str) -> str:
+    def bullets(items: dict[str, list[tuple[int, str]]], one: str, many: str) -> str:
         if not items:
-            return "None."
-        return "\n".join(
-            f"- {path}: {len(lines)} {suffix} (lines {', '.join(str(n) for n, _ in lines)})"
-            for path, lines in sorted(items.items())
-        )
+            return "Nessuno."
+        rows = []
+        for path, lines in sorted(items.items()):
+            word = one if len(lines) == 1 else many
+            row_lines = ", ".join(str(n) for n, _ in lines)
+            rows.append(f"- {path}: {len(lines)} {word} (righe {row_lines})")
+        return "\n".join(rows)
 
     def risky_bullets(items: dict[str, list[tuple[int, str]]]) -> str:
         if not items:
-            return "None."
+            return "Nessuno."
         out = []
         for path, lines in sorted(items.items()):
             for lineno, snippet in lines[:3]:
                 out.append(f"- {path}:{lineno}: {snippet[:90]}")
         return "\n".join(out)
 
-    untested_block = "None." if not untested else "\n".join(f"- {path}" for path in untested)
+    untested_block = "Nessuno." if not untested else "\n".join(f"- {path}" for path in untested)
 
     risky_block = risky_bullets(risky_hits)
     if security:
-        risky_block = (risky_block if risky_block != "None." else "") + "\n" + security
-        risky_block = risky_block.strip() or "None."
+        risky_block = (risky_block if risky_block != "Nessuno." else "") + "\n" + security
+        risky_block = risky_block.strip() or "Nessuno."
 
     fixes = []
     for path in untested[:2]:
-        fixes.append(f"Add tests for `{path}`.")
+        fixes.append(f"Aggiungi test per `{path}`.")
     if todo_hits:
         top = max(todo_hits.items(), key=lambda kv: len(kv[1]))[0]
-        fixes.append(f"Triage the TODO cluster in `{top}`.")
+        fixes.append(f"Esamina il cluster di TODO in `{top}`.")
     if risky_hits:
         top = sorted(risky_hits)[0]
-        fixes.append(f"Remove the risky pattern in `{top}`.")
+        fixes.append(f"Rimuovi il pattern rischioso in `{top}`.")
     if not fixes:
-        fixes = ["No action required."]
+        fixes = ["Nessuna azione necessaria."]
 
-    return f"""# Repo audit
+    return f"""# Analisi della repo
 
-## Summary
+## Riepilogo
 
 {summary}
 
-## Untested modules
+## Moduli senza test
 
 {untested_block}
 
-## TODO clusters
+## Cluster di TODO
 
-{bullets(todo_hits, "marker(s)")}
+{bullets(todo_hits, "marcatore", "marcatori")}
 
-## Risky patterns
+## Pattern rischiosi
 
 {risky_block}
 
-## Top 3 fixes
+## Prime 3 correzioni
 
 """ + "\n".join(f"{i}. {fix}" for i, fix in enumerate(fixes[:3], 1)) + "\n"
 
@@ -359,21 +363,21 @@ def demo() -> int:
         (root / "src" / "app.py").write_text("def main():\n    return 0\n")
         (root / "tests" / "test_app.py").write_text("from src.app import main\n\ndef test_main():\n    assert main() == 0\n")
 
-        print(f"auditing demo repo: {root}")
+        print(f"analisi della repo di esempio: {root}")
         result = audit(root)
-        print(f"[{result.stopped}] turns={result.turns} tokens={result.tokens}")
+        print(f"[{result.stopped}] turni={result.turns} token={result.tokens}")
         print()
         print(result.report)
-        print(f"report written to: {result.path}")
+        print(f"report scritto in: {result.path}")
         return 0 if result.stopped == "completed" else 1
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="repo_doctor", description="Audit a repository.")
-    parser.add_argument("--root", type=Path, help="repository to audit")
-    parser.add_argument("--demo", action="store_true", help="audit a generated sample repo")
-    parser.add_argument("--eval", action="store_true", help="run the capstone eval suite")
-    parser.add_argument("--transcript", action="store_true", help="print the full transcript")
+    parser = argparse.ArgumentParser(prog="repo_doctor", description="Analizza una repository.")
+    parser.add_argument("--root", type=Path, help="repository da analizzare")
+    parser.add_argument("--demo", action="store_true", help="analizza una repo di esempio generata")
+    parser.add_argument("--eval", action="store_true", help="esegue la suite di eval del progetto finale")
+    parser.add_argument("--transcript", action="store_true", help="stampa la trascrizione completa")
     args = parser.parse_args(argv)
 
     if args.eval:

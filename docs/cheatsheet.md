@@ -1,138 +1,138 @@
 # Cheat sheet
 
-One page. Print it.
+Una pagina. Stampala.
 
-## The loop
+## Il ciclo
 
 ```
-budget → model(transcript, tools) → assistant message
-      → no tool calls? DONE
-      → for each call: pre-hook → dispatch → post-hook → tool message
-      → repeat
+budget → model(transcript, tools) → messaggio assistant
+      → nessuna chiamata a strumenti? FINE
+      → per ogni chiamata: pre-hook → dispatch → post-hook → messaggio tool
+      → ripeti
 ```
 
-Invariants: tool call ids are paired, results follow in order, a run is done
-only when a reply has no tool calls.
+Invarianti: gli id delle chiamate agli strumenti sono accoppiati, i risultati seguono in ordine,
+un'esecuzione è conclusa solo quando una risposta non contiene chiamate agli strumenti.
 
-## The five components
+## I cinque componenti
 
-| Component | Owns | Failure |
+| Componente | Possiede | Fallimento |
 |---|---|---|
-| Model | next token | hallucination, staleness |
-| Harness | loop, context, limits | bad trimming, runaway |
-| Tools | actions | wrong schema, blast radius |
-| Environment | repo, runtime, secrets | missing deps, leaks |
-| Human | task, approval, review | vague task, rubber stamp |
+| Modello | il prossimo token | allucinazione, obsolescenza |
+| Harness | ciclo, contesto, limiti | trimming sbagliato, fuga incontrollata |
+| Strumenti | azioni | schema errato, raggio d'impatto |
+| Ambiente | repo, runtime, segreti | dipendenze mancanti, fughe |
+| Umano | task, approvazione, revisione | task vago, timbro automatico |
 
-## Context budget
+## Budget del contesto
 
 ```
 usable = window − reserve_for_reply
 ```
 
-Spend it in this order: task → rules → narrow code → evidence → recent turns →
-background. Everything else is retrieval or a skill.
+Spendilo in questo ordine: task → regole → codice mirato → evidenze → turni recenti →
+contesto di sfondo. Tutto il resto è retrieval o una skill.
 
-- Cost grows ~quadratically with turns (each turn resends the transcript).
-- Compaction is lossy; mark summaries as summaries.
-- Smaller, relevant context beats larger, complete context.
+- Il costo cresce circa in modo quadratico con i turni (ogni turno rimanda la trascrizione).
+- La compaction introduce perdita; segna i riassunti come riassunti.
+- Un contesto più piccolo e pertinente batte un contesto più grande e completo.
 
-## Tool design
+## Progettazione degli strumenti
 
-- Flat parameters, few of them, enums over strings.
-- Descriptions are prompt text: say *what* and *when*.
-- Errors are messages, never exceptions.
-- Truncate with a marker; paginate reads.
-- Declare side effects; keep the surface under ~20.
+- Parametri piatti, pochi, enum invece di stringhe.
+- Le descrizioni sono testo di prompt: di' *cosa* e *quando*.
+- Gli errori sono messaggi, mai eccezioni.
+- Tronca con un marcatore; pagina le letture.
+- Dichiara gli effetti collaterali; tieni la superficie sotto ~20.
 
-## Instructions / skills / tools
+## Istruzioni / skill / strumenti
 
-| | Loaded | Contains | Example |
+| | Caricato | Contiene | Esempio |
 |---|---|---|---|
-| `AGENTS.md` | always | constraints | "run `make test`" |
-| Skill | on demand | procedure | "how to write a migration" |
-| Tool | schema always | action | `read_file` |
+| `AGENTS.md` | sempre | vincoli | "esegui `make test`" |
+| Skill | su richiesta | procedura | "come scrivere una migrazione" |
+| Strumento | schema sempre | azione | `read_file` |
 
-Description formula for skills: **output + when to use + user phrases.**
+Formula della descrizione per le skill: **output + quando usarla + frasi dell'utente.**
 
-## Hooks
+## Hook
 
-| Event | Can |
+| Evento | Può |
 |---|---|
-| `pre_tool` | block, rewrite args |
-| `post_tool` | redact, truncate |
-| `pre_edit` | block a path |
-| `post_edit` | format, typecheck |
-| `session_start/end` | setup, metrics |
+| `pre_tool` | bloccare, riscrivere gli argomenti |
+| `post_tool` | oscurare, troncare |
+| `pre_edit` | bloccare un percorso |
+| `post_edit` | formattare, typecheck |
+| `session_start/end` | setup, metriche |
 
-- A prompt is a suggestion; a hook is a rule.
-- Fail closed for guards.
-- Return `None` to abstain, not `True`.
-- Layers: instruction < hook < permission < sandbox.
+- Un prompt è un suggerimento; un hook è una regola.
+- Fallisci in modo chiuso per le protezioni.
+- Restituisci `None` per astenerti, non `True`.
+- Livelli: istruzione < hook < permesso < sandbox.
 
-## Subagents
+## Subagenti
 
-- Trade: fidelity + money → context headroom + parallelism.
-- Task statement must be self-contained.
-- Return structured, cited summaries, not prose.
-- Fan out for reading; serialise for writing.
-- Reviewer pattern: fresh context, read-only, cites `file:line`.
+- Scambio: fedeltà + denaro → margine di contesto + parallelismo.
+- L'enunciato del task deve essere autosufficiente.
+- Restituisci riassunti strutturati e con citazioni, non prosa.
+- Fai fan-out per la lettura; serializza per la scrittura.
+- Pattern del revisore: contesto fresco, sola lettura, cita `file:line`.
 
 ## MCP
 
-- JSON-RPC 2.0 over stdio or HTTP.
+- JSON-RPC 2.0 su stdio o HTTP.
 - `initialize` → `tools/list` → `tools/call`.
-- Tools (model), resources (app), prompts (user).
-- A server is a program you are handing your agent.
-- Notifications have no `id` and no response.
+- Strumenti (modello), risorse (app), prompt (utente).
+- Un server è un programma che stai consegnando al tuo agente.
+- Le notifiche non hanno `id` e non hanno risposta.
 
-## Verification ladder
-
-```
-compile → lint → types → unit → integration → manual review
-```
-
-A model's "done" is text. A test result is evidence.
-
-## Evals
-
-- Task + fresh environment + outcome grader.
-- Grade the workspace, not the transcript.
-- Include a refusal case and a no-op case.
-- Report pass@k; one run is noise.
-- Every incident becomes a permanent case.
-
-## Safety
-
-- Threats: mistake, injection, supply chain, exfiltration.
-- Injection cannot be fixed with a prompt; instructions and data share a channel.
-- Make success uninteresting: no secrets, no network, no shell.
-- Default deny for side effects; approval for push, delete, install, deploy.
-- Path jail = correctness. Container = security.
-
-## Workflow
+## Scala di verifica
 
 ```
-explore → plan → execute → verify → report
+compile → lint → types → unit → integration → revisione manuale
 ```
 
-- Plan before editing; read before writing.
-- TDD: the test is a fixed target and its failure is evidence.
-- One concern per session; fresh session after three failures.
-- Cap diff size; review before commit; human commits.
-- Stop when: same failure twice, diff grows while red, scope creep, or you
-  cannot explain the change.
+Il "fatto" di un modello è testo. Il risultato di un test è evidenza.
 
-## Metrics
+## Eval
 
-Acceptance rate, revert rate, human edit rate, cycle time, cost per merged PR,
-escaped defects. Not lines generated.
+- Task + ambiente fresco + valutatore dell'esito.
+- Valuta il workspace, non la trascrizione.
+- Includi un caso di rifiuto e un caso no-op.
+- Riporta pass@k; un'unica esecuzione è rumore.
+- Ogni incidente diventa un caso permanente.
 
-## When something goes wrong
+## Sicurezza
 
-1. Stop the session.
-2. Preserve the transcript.
-3. Read the diff, not the summary.
-4. Revert to a known state.
-5. Write an eval that reproduces it.
-6. Add a control at the lowest layer that would have prevented it.
+- Minacce: errore, injection, supply chain, esfiltrazione.
+- L'injection non si risolve con un prompt; istruzioni e dati condividono un canale.
+- Rendi il successo poco interessante: niente segreti, niente rete, niente shell.
+- Nega per default gli effetti collaterali; approvazione per push, delete, install, deploy.
+- Path jail = correttezza. Container = sicurezza.
+
+## Flusso di lavoro
+
+```
+esplora → pianifica → esegui → verifica → riporta
+```
+
+- Pianifica prima di modificare; leggi prima di scrivere.
+- TDD: il test è un bersaglio fisso e il suo fallimento è evidenza.
+- Una sola preoccupazione per sessione; sessione nuova dopo tre fallimenti.
+- Limita la dimensione del diff; rivedi prima del commit; il commit lo fa l'umano.
+- Fermati quando: stesso fallimento due volte, il diff cresce mentre è rosso, scope creep, o non
+  sai spiegare la modifica.
+
+## Metriche
+
+Tasso di accettazione, tasso di revert, tasso di modifiche umane, cycle time, costo per PR mergiata,
+difetti sfuggiti. Non righe generate.
+
+## Quando qualcosa va storto
+
+1. Ferma la sessione.
+2. Conserva la trascrizione.
+3. Leggi il diff, non il riassunto.
+4. Torna a uno stato noto.
+5. Scrivi un'eval che lo riproduce.
+6. Aggiungi un controllo al livello più basso che lo avrebbe prevenuto.

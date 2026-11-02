@@ -35,7 +35,7 @@ class CapstoneGuardTests(unittest.TestCase):
         self.assertFalse((self.root / "src" / "hacked.py").exists())
         denied = [m for m in result.messages if m.role == "tool" and "DENIED" in m.content]
         self.assertEqual(len(denied), 1)
-        self.assertIn("only REPORT.md", denied[0].content)
+        self.assertIn("solo REPORT.md", denied[0].content)
 
     def test_report_write_is_allowed(self):
         ws = Workspace(self.root)
@@ -78,7 +78,7 @@ class CapstoneGuardTests(unittest.TestCase):
 
         agent = build_doctor(ws, llm=PolicyLLM(eager))
         result = agent.run("delegate twice")
-        self.assertIn("nested delegation is disabled", result.transcript())
+        self.assertIn("delega annidata", result.transcript())
 
 
 class CapstoneEvalTests(unittest.TestCase):

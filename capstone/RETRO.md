@@ -1,46 +1,46 @@
-# Retro — repo_doctor
+# Retrospettiva — repo_doctor
 
-Fill this in after you have run the evals and audited at least one real repo.
-Be specific. "It worked well" is not a retro.
+Compilala dopo aver eseguito le eval e aver analizzato almeno una repo vera.
+Sii specifico. "È andata bene" non è una retrospettiva.
 
-## What surprised me
+## Cosa mi ha sorpreso
 
 -
 
-## What the agent got wrong
+## Cosa ha sbagliato l'agente
 
-| Failure | Which control caught it? | Would a different control have caught it sooner? |
+| Fallimento | Quale controllo l'ha catturato? | Un controllo diverso l'avrebbe catturato prima? |
 |---|---|---|
-|  | test / hook / budget / review |  |
+|  | test / hook / budget / revisione |  |
 
-## The task statement
+## Il testo del compito
 
-What did the agent misread, and what wording would have prevented it?
-
--
-
-## The subagent
-
-- What did the delegation buy, in tokens or latency?
-- What did the summary lose that the parent needed?
-- Was the task statement self-contained?
-
-## The hook
-
-- Which rule did you enforce in code rather than prose?
-- Did the denial reach the model in a form it could act on?
-- What would have happened without it?
-
-## The evals
-
-- Which case was hardest to write? Why?
-- Did any case pass for the wrong reason?
-- Which case would you add after this session?
-
-## What is still unproven
+Cosa ha frainteso l'agente, e quale formulazione l'avrebbe impedito?
 
 -
 
-## One change for next time
+## Il subagente
+
+- Cosa ha comprato la delega, in token o latenza?
+- Cosa ha perso il riassunto di cui il padre aveva bisogno?
+- Il testo del compito era autosufficiente?
+
+## L'hook
+
+- Quale regola hai imposto nel codice invece che nella prosa?
+- Il rifiuto è arrivato al modello in una forma su cui poteva agire?
+- Cosa sarebbe successo senza?
+
+## Le eval
+
+- Quale caso è stato più difficile da scrivere? Perché?
+- Qualche caso è passato per il motivo sbagliato?
+- Quale caso aggiungeresti dopo questa sessione?
+
+## Cosa resta non provato
+
+-
+
+## Un cambiamento per la prossima volta
 
 -

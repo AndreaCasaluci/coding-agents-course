@@ -1,164 +1,169 @@
-# 05 — Context Engineering
+# 05 — Ingegneria del contesto
 
-> **Objectives**
-> - Account for every token in a call.
-> - Choose between stuffing, retrieval, and compaction.
-> - Explain why more context often makes agents worse.
+> **Obiettivi**
+> - Rendicontare ogni token di una chiamata.
+> - Scegliere tra stuffing, retrieval e compressione.
+> - Spiegare perché più contesto spesso rende gli agenti peggiori.
 
-## The budget, concretely
+## Il budget, concretamente
 
 ```
-usable = window - reserve_for_reply
+utilizzabile = finestra - riserva_per_la_risposta
 ```
 
-With a 32k budget and a 4k reserve, you have 28k to spend. A typical turn:
+Con un budget di 32k e una riserva di 4k, hai 28k da spendere. Un turno tipico:
 
-| Item | Tokens |
+| Voce | Token |
 |---|---|
 | system prompt | 800 |
-| AGENTS.md | 1,200 |
-| 6 tool schemas | 900 |
-| transcript so far | 12,000 |
-| latest tool result | 8,000 |
-| **total** | **22,900** |
-| remaining | 5,100 |
+| AGENTS.md | 1.200 |
+| 6 schemi di strumenti | 900 |
+| trascrizione finora | 12.000 |
+| ultimo risultato di uno strumento | 8.000 |
+| **totale** | **22.900** |
+| rimanenti | 5.100 |
 
-That remaining number is the one to watch. When it approaches zero, the next
-tool result gets truncated or the turn gets trimmed — and the model starts
-"forgetting" things. Nothing is wrong with the model; the budget ran out.
+Il numero da tenere d'occhio è l'ultimo. Quando si avvicina a zero, il prossimo
+risultato viene troncato o il turno viene tagliato — e il modello inizia a
+"dimenticare" cose. Non c'è niente di sbagliato nel modello: è finito il budget.
 
-## Three strategies
+## Tre strategie
 
-### 1. Stuffing
+### 1. Stuffing (riempire)
 
-Put everything relevant in the prompt. Works when the corpus is small and
-stable (a single file, a short spec). Fails at repo scale, and degrades quality
-before it fails outright.
+Metti nel prompt tutto ciò che è rilevante. Funziona quando il corpus è piccolo e
+stabile (un singolo file, una specifica breve). Fallisce alla scala di una repo, e
+peggiora la qualità prima ancora di fallire del tutto.
 
-### 2. Retrieval
+### 2. Retrieval (recupero)
 
-Fetch only what the task needs, on demand. This is what tools give you:
-`search` then `read_file(start, end)` instead of `read_file(everything)`.
+Recupera solo ciò che serve al compito, su richiesta. È ciò che ti danno gli
+strumenti: `search` poi `read_file(start, end)` invece di `read_file(tutto)`.
 
-Retrieval quality dominates agent quality. An agent that greps well beats a
-smarter model that reads the wrong file.
+La qualità del recupero domina la qualità dell'agente. Un agente che fa bene
+grep batte un modello più intelligente che legge il file sbagliato.
 
-### 3. Compaction
+### 3. Compressione
 
-When history outgrows the budget, replace old turns with a summary.
+Quando la cronologia supera il budget, sostituisci i turni vecchi con un
+riassunto.
 
 ```
 [system]
-[summary of turns 1–14: explored dates module, found parse_date at
- src/dates.py:41, added guard, test_empty_string still failing]
-[turn 15 …]
+[riassunto dei turni 1–14: esplorato il modulo dates, trovato parse_date a
+ src/dates.py:41, aggiunto un controllo, test_empty_string ancora rosso]
+[turno 15 …]
 ```
 
-Compaction is **lossy by definition**. What survives depends on what the
-summariser kept. Typical casualties: exact file contents, the reason a
-hypothesis was rejected, the user's original wording.
+La compressione è **lossy per definizione**. Cosa sopravvive dipende da cosa ha
+tenuto il riassuntore. Vittime tipiche: il contenuto esatto dei file, il motivo
+per cui un'ipotesi è stata scartata, le parole originali dell'utente.
 
-The harness here marks compacted spans explicitly so the model knows it is
-working from a summary:
+L'harness qui marca esplicitamente le parti compresse, così il modello sa di
+lavorare su un riassunto:
 
 ```python
 Message("user", "[compacted earlier conversation — summary, not verbatim]\n...")
 ```
 
-Without that marker, the model treats the summary as ground truth and stops
-re-reading the file.
+Senza quel marcatore, il modello tratta il riassunto come verità e smette di
+rileggere il file.
 
-## What belongs in the window
+## Cosa deve stare nella finestra
 
-Priority order, highest first:
+Ordine di priorità, dal più alto:
 
-1. **The current task**, verbatim.
-2. **The rules that must not be violated** (system prompt, instructions).
-3. **The code being changed**, as narrowly as possible.
-4. **Evidence**: test output, error messages, search hits.
-5. **Recent conversation**, the last few turns.
-6. **Background**: architecture notes, conventions.
+1. **Il compito attuale**, verbatim.
+2. **Le regole che non devono essere violate** (system prompt, istruzioni).
+3. **Il codice da modificare**, il più ristretto possibile.
+4. **Le prove**: output dei test, messaggi di errore, risultati di ricerca.
+5. **La conversazione recente**, gli ultimi turni.
+6. **Il contesto di sfondo**: note di architettura, convenzioni.
 
-And what does not:
+E cosa non deve starci:
 
-- full directory listings when one glob would do,
-- entire lockfiles, minified bundles, base64 blobs,
-- logs from successful runs,
-- duplicated instructions in three places,
-- the model's own long reasoning from ten turns ago.
+- elenchi completi di directory quando basta un glob,
+- interi lockfile, bundle minificati, blob base64,
+- log di esecuzioni riuscite,
+- istruzioni duplicate in tre posti,
+- il lungo ragionamento del modello di dieci turni fa.
 
-## Context rot
+## Degrado del contesto
 
-Models do not attend uniformly across a long window. Empirically:
+I modelli non prestano attenzione in modo uniforme su una finestra lunga. In
+pratica:
 
-- material at the start and end is recalled better than the middle,
-- irrelevant content measurably degrades reasoning,
-- very long contexts increase latency and cost superlinearly.
+- il materiale all'inizio e alla fine viene richiamato meglio di quello al
+  centro,
+- il contenuto irrilevante degrada misurabilmente il ragionamento,
+- contesti molto lunghi aumentano latenza e costo in modo superlineare.
 
-So the counter-intuitive rule: **a smaller, well-chosen context usually
-produces better output than a larger, complete one.** If quality drops after
-you added documentation, remove the documentation.
+Quindi la regola controintuitiva: **un contesto più piccolo e ben scelto produce
+di solito un output migliore di uno più grande e completo.** Se la qualità cala
+dopo che hai aggiunto documentazione, togli la documentazione.
 
-## Prompt caching
+## Caching del prompt
 
-Providers can cache a stable prefix (system prompt + tools + early history) and
-charge less for re-sending it. Two design implications:
+I provider possono cachare un prefisso stabile (system prompt + strumenti +
+cronologia iniziale) e farlo pagare meno. Due implicazioni di progetto:
 
-- **Keep the prefix stable.** Changing the system prompt or tool order every
-  turn invalidates the cache.
-- **Append, do not rewrite.** History that only grows is cache-friendly;
-  aggressive re-ordering is not.
+- **Tieni stabile il prefisso.** Cambiare il system prompt o l'ordine degli
+  strumenti a ogni turno invalida la cache.
+- **Accoda, non riscrivere.** Una cronologia che solo cresce è compatibile con
+  la cache; un riordino aggressivo no.
 
-This is a cost lever, not a quality lever, but it changes the economics of
-long sessions substantially.
+È una leva sul costo, non sulla qualità, ma cambia molto l'economia delle
+sessioni lunghe.
 
-## Context engineering is the job
+## L'ingegneria del contesto è il lavoro
 
-Most "make the agent smarter" work is actually:
+La maggior parte del lavoro "rendi l'agente più intelligente" è in realtà:
 
-| Symptom | Real fix |
+| Sintomo | Vera soluzione |
 |---|---|
-| Reads the wrong files | Better search tool, better descriptions |
-| Forgets constraints | Move them to the system prompt / AGENTS.md |
-| Repeats failed attempts | Keep failures in context; do not trim them first |
-| Gets confused by a big repo | Scope the workspace; add a subdirectory AGENTS.md |
-| Slow and expensive | Fresh sessions; compaction; smaller tool results |
+| Legge i file sbagliati | Strumento di ricerca migliore, descrizioni migliori |
+| Dimentica i vincoli | Spostali nel system prompt / AGENTS.md |
+| Ripete tentativi falliti | Tieni i fallimenti nel contesto; non tagliarli per primi |
+| Si confonde in una repo grande | Delimita il workspace; aggiungi un AGENTS.md nella sottodirectory |
+| Lento e costoso | Sessioni nuove; compressione; risultati più piccoli |
 
-Notice that none of these is "use a bigger model".
+Nota che nessuna di queste è "usa un modello più grande".
 
-## The subagent shortcut
+## La scorciatoia del subagente
 
-The most effective context technique is often *not sending the context at all*.
-Spawn a subagent with a clean window, let it burn 40k tokens exploring, and
-bring back a 300-token summary. You trade fidelity for budget. Module 09 covers
-when that trade is worth it.
+La tecnica di contesto più efficace spesso è *non inviare affatto il contesto*.
+Avvia un subagente con una finestra pulita, lascialo bruciare 40k token di
+esplorazione e riporta indietro un riassunto da 300 token. Scambi fedeltà per
+budget. Il modulo 09 spiega quando conviene.
 
-## Lab
+## Laboratorio
 
 ```bash
 python3 labs/L05_context.py
 ```
 
-You will build a transcript that overflows, watch it get trimmed at a turn
-boundary, then watch compaction replace the dropped span with a summary — and
-see exactly what information disappears.
+Costruirai una trascrizione che va in overflow, la vedrai troncata al confine di
+un turno, poi vedrai la compressione sostituire la parte eliminata con un
+riassunto — e esattamente quali informazioni spariscono.
 
-🔬 **Break it:** set `reserve=0` and watch the model's reply get squeezed out.
+🔬 **Fallo fallire:** imposta `reserve=0` e guarda la risposta del modello venire
+compressa fino a sparire.
 
-## ✅ Checkpoint
+## ✅ Verifica
 
-1. Why does cost grow superlinearly with turns?
-2. When is stuffing better than retrieval?
-3. What is lost in compaction, typically?
-4. Why mark a summary as a summary?
-5. Why can adding documentation make an agent worse?
+1. Perché il costo cresce in modo superlineare con i turni?
+2. Quando lo stuffing è meglio del retrieval?
+3. Cosa si perde tipicamente nella compressione?
+4. Perché marcare un riassunto come riassunto?
+5. Perché aggiungere documentazione può peggiorare un agente?
 
 <details>
-<summary>Answers</summary>
+<summary>Risposte</summary>
 
-1. Each turn resends a transcript that has grown.
-2. Small, stable corpora — one file, a short spec.
-3. Exact contents, rejected hypotheses, original wording.
-4. Otherwise the model treats it as verbatim truth and stops re-reading.
-5. Context rot: irrelevant material dilutes attention and increases cost.
+1. Ogni turno reinvia una trascrizione che è cresciuta.
+2. Con corpus piccoli e stabili — un file, una specifica breve.
+3. Contenuti esatti, ipotesi scartate, parole originali.
+4. Altrimenti il modello lo tratta come verità verbatim e smette di rileggere.
+5. Degrado del contesto: il materiale irrilevante diluisce l'attenzione e
+   aumenta il costo.
 </details>

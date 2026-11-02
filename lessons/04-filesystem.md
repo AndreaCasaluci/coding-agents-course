@@ -1,146 +1,159 @@
-# 04 — The Filesystem as the World
+# 04 — Il filesystem come mondo
 
-> **Objectives**
-> - Explain why coding agents are filesystem-shaped.
-> - Design a read/search/edit tool surface that survives stale state.
-> - Recognise the path and patch failure modes before they cost you a file.
+> **Obiettivi**
+> - Spiegare perché gli agenti di coding hanno la forma del filesystem.
+> - Progettare una superficie di lettura/ricerca/modifica che sopravviva allo
+>   stato obsoleto.
+> - Riconoscere le modalità di fallimento di percorsi e patch prima che ti
+>   costino un file.
 
-## Why the repo is the interface
+## Perché la repo è l'interfaccia
 
-An agent that can read, search, and edit files can work on any language, any
-framework, any build system — without a bespoke integration. The filesystem is
-the lowest common denominator of software work, and it already has the
-properties you need: durable, diffable, versioned, and inspectable.
+Un agente che sa leggere, cercare e modificare file può lavorare su qualsiasi
+linguaggio, framework e build system — senza un'integrazione dedicata. Il
+filesystem è il minimo comun denominatore del lavoro software, e possiede già le
+proprietà che servono: durevole, confrontabile con diff, versionato e
+ispezionabile.
 
-This is why the dominant coding-agent design is "a shell with opinions", not
-"a plugin for each IDE".
+Per questo il design dominante degli agenti di coding è "una shell con opinioni",
+non "un plugin per ogni IDE".
 
-## The canonical surface
+## La superficie canonica
 
-Six tools cover almost everything:
+Sei strumenti coprono quasi tutto:
 
-| Tool | Purpose | Read/write |
+| Strumento | Scopo | Lettura/scrittura |
 |---|---|---|
-| `list_files(path, depth)` | orientation | read |
-| `read_file(path, start, end)` | inspect | read |
-| `search(pattern, glob)` | locate | read |
-| `write_file(path, content)` | create / replace | write |
-| `edit_file(path, old, new)` | surgical change | write |
-| `delete_file(path)` | remove | write |
+| `list_files(path, depth)` | orientarsi | lettura |
+| `read_file(path, start, end)` | ispezionare | lettura |
+| `search(pattern, glob)` | localizzare | lettura |
+| `write_file(path, content)` | creare / sostituire | scrittura |
+| `edit_file(path, old, new)` | modifica chirurgica | scrittura |
+| `delete_file(path)` | rimuovere | scrittura |
 
-Notice what is missing: no `move`, no `chmod`, no `git`. Add them only when the
-task demands it. Every extra tool is context spent and a new way to be wrong.
+Nota cosa manca: niente `move`, niente `chmod`, niente `git`. Aggiungili solo
+quando il compito lo richiede. Ogni strumento in più è contesto speso e un nuovo
+modo di sbagliare.
 
-## Read before edit is not optional
+## Leggere prima di modificare non è opzionale
 
-The model's knowledge of a file is a **copy in the transcript**. That copy goes
-stale the moment anything else touches the file: another agent, the user, a
-formatter, a build step.
-
-```
-turn 3: read_file("app.py")      → copy A in context
-turn 4: user edits app.py        → disk is now B
-turn 5: model edits based on A   → corrupts the user's change
-```
-
-The harness cannot fully prevent this. It can make it *detectable*:
-
-- **Unique-anchor edits.** `edit_file(old, new)` fails if `old` is missing or
-  appears more than once. A stale copy usually fails loudly instead of
-  silently overwriting.
-- **Read-before-write tracking.** Some harnesses refuse an edit to a file that
-  was not read in this session, or whose mtime changed since the read.
-- **Small reads.** Re-read the changed region before a second edit, not the
-  whole file.
-
-## Why patches beat rewrites
-
-`write_file` with full content is the most dangerous tool in the box:
+La conoscenza che il modello ha di un file è una **copia nella trascrizione**.
+Quella copia diventa obsoleta nel momento in cui qualcosa tocca il file: un altro
+agente, l'utente, un formatter, una build.
 
 ```
-model has stale copy (200 lines)
-write_file(path, stale_content)
-→ 3 lines of the user's new work are gone
+turno 3: read_file("app.py")      → copia A nel contesto
+turno 4: l'utente modifica app.py → il disco ora è B
+turno 5: il modello modifica su A → corrompe la modifica dell'utente
 ```
 
-`edit_file(old, new)` with a unique anchor:
+L'harness non può impedirlo del tutto. Può renderlo *rilevabile*:
+
+- **Modifiche con ancora unica.** `edit_file(old, new)` fallisce se `old` manca
+  o compare più di una volta. Una copia obsoleta di solito fallisce
+  rumorosamente invece di sovrascrivere in silenzio.
+- **Tracciamento lettura-prima-di-scrittura.** Alcuni harness rifiutano una
+  modifica a un file non letto in questa sessione, o il cui mtime è cambiato
+  dalla lettura.
+- **Letture piccole.** Rileggi la regione modificata prima di una seconda
+  modifica, non tutto il file.
+
+## Perché le patch battono le riscritture
+
+`write_file` con il contenuto completo è lo strumento più pericoloso del
+cassetto:
+
+```
+il modello ha una copia obsoleta (200 righe)
+write_file(path, contenuto_obsoleto)
+→ 3 righe del nuovo lavoro dell'utente sono sparite
+```
+
+`edit_file(old, new)` con un'ancora unica:
 
 ```
 old = "def parse_date(s):\n    return datetime.strptime(s, FMT)"
 new = "def parse_date(s):\n    if not s:\n        raise ValueError('empty')\n    return datetime.strptime(s, FMT)"
 ```
 
-is bounded: it either matches exactly once and applies, or it fails and says
-why. The blast radius is the anchor, not the file.
+è limitato: o trova esattamente una corrispondenza e applica, oppure fallisce e
+spiega perché. Il raggio d'impatto è l'ancora, non il file.
 
-> Rule of thumb: **rewrite only when creating a new file.** For existing files,
-> edit.
+> Regola pratica: **riscrivi solo quando crei un file nuovo.** Per i file
+> esistenti, modifica.
 
-## Staleness in practice
+## Obsolescenza in pratica
 
-The most common agent loop is:
+Il ciclo più comune è:
 
-1. Read a 300-line file (7k tokens).
-2. Make edit #1.
-3. Make edit #2 using the *pre-edit* content as the anchor.
-4. Edit #2 fails or, worse, applies in the wrong place.
+1. Leggi un file da 300 righe (7k token).
+2. Fai la modifica #1.
+3. Fai la modifica #2 usando il contenuto *pre-modifica* come ancora.
+4. La modifica #2 fallisce o, peggio, si applica nel posto sbagliato.
 
-Mitigations, in order of effectiveness:
+Mitigazioni, in ordine di efficacia:
 
-- **Edit in one call when possible** — one `old`/`new` covering both changes.
-- **Re-read the region** between edits (cheap: `start`/`end`).
-- **Anchor on small, unique strings**, not whole functions.
-- **Verify after editing**: read back the region or run the tests.
+- **Modifica in una sola chiamata quando possibile** — un unico `old`/`new` che
+  copre entrambe le modifiche.
+- **Rileggi la regione** tra una modifica e l'altra (economico:
+  `start`/`end`).
+- **Ancora su stringhe piccole e uniche**, non su intere funzioni.
+- **Verifica dopo la modifica**: rileggi la regione o esegui i test.
 
-## Search is the real superpower
+## La ricerca è il vero superpotere
 
-An agent with `grep` does not need the repo in context. It needs to know *where
-to look*.
+Un agente con `grep` non ha bisogno della repo nel contesto. Ha bisogno di sapere
+*dove guardare*.
 
-Good search output:
+Buon output di ricerca:
 
 ```
 src/dates.py:41: def parse_date(s):
 tests/test_dates.py:12: from src.dates import parse_date
 ```
 
-Bad search output:
+Cattivo output di ricerca:
 
 ```
-[7000 lines of matches]
+[7000 righe di corrispondenze]
 ```
 
-Design rules:
+Regole di progetto:
 
-- Cap matches (200 is plenty) and say when you capped.
-- Include path and line number so the next read is a range, not a file.
-- Support a glob filter (`*.py`) — it is the cheapest precision tool available.
-- Return `(no matches)` explicitly. Silence reads as success.
+- Limita le corrispondenze (200 bastano) e dì quando hai troncato.
+- Includi percorso e numero di riga, così la lettura successiva è un intervallo,
+  non un file.
+- Supporta un filtro glob (`*.py`) — è lo strumento di precisione più economico
+  disponibile.
+- Restituisci esplicitamente `(no matches)`. Il silenzio viene letto come
+  successo.
 
-## Large files
+## File grandi
 
-A 5,000-line generated file will blow the budget on one read. The tool must:
+Un file generato da 5.000 righe farà saltare il budget con una sola lettura. Lo
+strumento deve:
 
-- truncate at a known character limit and **say so**,
-- support line ranges,
-- never truncate silently mid-token without a marker.
+- troncare a un limite di caratteri noto e **dirlo**,
+- supportare intervalli di righe,
+- non troncare mai in silenzio a metà token senza un marcatore.
 
-`Workspace.read` does this with `MAX_READ_CHARS` and an explicit
-`[truncated: ...]` suffix. The model can then ask for a range. Without the
-marker, it believes it saw the whole file and edits blind.
+`Workspace.read` lo fa con `MAX_READ_CHARS` e un suffisso esplicito
+`[truncated: ...]`. Il modello può quindi chiedere un intervallo. Senza il
+marcatore, crede di aver visto tutto il file e modifica alla cieca.
 
-## Path safety
+## Sicurezza dei percorsi
 
-The agent supplies paths as text. Text can escape:
+L'agente fornisce i percorsi come testo. Il testo può evadere:
 
 ```
 ../../etc/passwd
-/absolute/path
+/percorso/assoluto
 link → /etc/passwd        (symlink)
 a/../../b
 ```
 
-The only reliable check is: **resolve to a real path, then verify containment**.
+L'unico controllo affidabile è: **risolvi a un percorso reale, poi verifica il
+contenimento**.
 
 ```python
 real = (root / path).resolve()
@@ -148,63 +161,65 @@ if real != root and root not in real.parents:
     raise WorkspaceError(...)
 ```
 
-Note `.resolve()` follows symlinks, so the symlink case is caught. Note also
-that this is a *correctness* boundary, not a security boundary against a
-hostile process — a determined attacker with code execution can bypass it. Real
-isolation is a container (module 12).
+Nota che `.resolve()` segue i symlink, quindi il caso del symlink viene
+intercettato. Nota anche che questo è un confine di *correttezza*, non di
+sicurezza contro un processo ostile — un attaccante determinato con esecuzione
+di codice può aggirarlo. L'isolamento vero è un container (modulo 12).
 
-## Git is your undo button
+## Git è il tuo pulsante annulla
 
-Before an agent session on a real repo:
-
-```bash
-git status          # know what is already dirty
-git switch -c agent/task-name
-```
-
-After:
+Prima di una sessione su una repo vera:
 
 ```bash
-git diff            # the only honest summary of what happened
+git status          # sappi cosa è già sporco
+git switch -c agent/nome-compito
 ```
 
-An agent's prose summary is a claim. `git diff` is evidence. Make reviewing the
-diff a habit and the agent's self-report becomes optional.
+Dopo:
 
-For parallel agents, use **worktrees** — separate checkouts on separate
-branches sharing one object store. Cheap isolation, no stashing, no conflicts
-until merge.
+```bash
+git diff            # l'unico riassunto onesto di cosa è successo
+```
 
-## Lab
+Il riassunto in prosa dell'agente è una dichiarazione. `git diff` è una prova.
+Rendi la revisione del diff un'abitudine e l'autovalutazione dell'agente diventa
+facoltativa.
+
+Per agenti paralleli usa i **worktree** — checkout separati su branch separati
+che condividono un unico object store. Isolamento economico, niente stash,
+niente conflitti fino al merge.
+
+## Laboratorio
 
 ```bash
 python3 labs/L04_filesystem.py
 ```
 
-The lab demonstrates the path jail (including a symlink escape), unique-anchor
-editing, ambiguous-match rejection, truncation with a marker, and a stale-copy
-corruption that a rewrite causes and an edit prevents.
+Il laboratorio dimostra la prigione dei percorsi (inclusa l'evasione tramite
+symlink), la modifica con ancora unica, il rifiuto delle corrispondenze ambigue,
+il troncamento con marcatore e una corruzione da copia obsoleta che una
+riscrittura causa e una modifica previene.
 
-🔬 **Break it:** comment out the containment check in `Workspace.resolve` and
-re-run. Watch `../../etc/passwd` resolve.
+🔬 **Fallo fallire:** commenta il controllo di contenimento in
+`Workspace.resolve` ed esegui di nuovo. Guarda `../../etc/passwd` risolversi.
 
-## ✅ Checkpoint
+## ✅ Verifica
 
-1. Why is the filesystem the natural interface for a coding agent?
-2. What makes `edit_file(old, new)` safer than `write_file(content)`?
-3. How does a stale read produce a wrong edit, and what detects it?
-4. Why must truncation be announced?
-5. What is the difference between a correctness boundary and a security
-   boundary here?
+1. Perché il filesystem è l'interfaccia naturale per un agente di coding?
+2. Cosa rende `edit_file(old, new)` più sicuro di `write_file(content)`?
+3. Come produce una modifica sbagliata una lettura obsoleta, e cosa la rileva?
+4. Perché il troncamento deve essere annunciato?
+5. Qual è la differenza tra confine di correttezza e confine di sicurezza qui?
 
 <details>
-<summary>Answers</summary>
+<summary>Risposte</summary>
 
-1. It is universal, durable, diffable, and versioned.
-2. The blast radius is bounded by the anchor; ambiguity fails loudly.
-3. The model's copy diverges from disk; unique-anchor failure or read-back
-   detects it.
-4. Otherwise the model believes it saw the whole file and edits blind.
-5. The path jail prevents mistakes; it does not stop code execution or a
-   determined attacker. Only isolation does.
+1. È universale, durevole, confrontabile con diff e versionato.
+2. Il raggio d'impatto è limitato dall'ancora; l'ambiguità fallisce
+   rumorosamente.
+3. La copia del modello diverge dal disco; il fallimento dell'ancora unica o una
+   rilettura lo rilevano.
+4. Altrimenti il modello crede di aver visto tutto il file e modifica alla cieca.
+5. La prigione dei percorsi previene gli errori; non ferma l'esecuzione di codice
+   o un attaccante determinato. Solo l'isolamento lo fa.
 </details>

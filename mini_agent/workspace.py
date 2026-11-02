@@ -37,7 +37,7 @@ class Workspace:
         if not self.root.exists():
             self.root.mkdir(parents=True, exist_ok=True)
         if not self.root.is_dir():
-            raise WorkspaceError(f"Workspace root is not a directory: {self.root}")
+            raise WorkspaceError(f"La radice del workspace non è una directory: {self.root}")
 
     # -- path handling -----------------------------------------------------
     def resolve(self, path: str) -> Path:
@@ -48,8 +48,8 @@ class Workspace:
         real = candidate.resolve()
         if real != self.root and self.root not in real.parents:
             raise WorkspaceError(
-                f"Path escapes the workspace: {path!r} -> {real}. "
-                "Use paths relative to the workspace root."
+                f"Il percorso esce dal workspace: {path!r} -> {real}. "
+                "Usa percorsi relativi alla radice del workspace."
             )
         return real
 
@@ -61,18 +61,18 @@ class Workspace:
 
     def _guard_write(self) -> None:
         if self.read_only:
-            raise WorkspaceError("Workspace is read-only.")
+            raise WorkspaceError("Il workspace è in sola lettura.")
 
     # -- reads -------------------------------------------------------------
     def list(self, path: str = ".", depth: int = 1) -> str:
         target = self.resolve(path)
         if not target.exists():
-            raise WorkspaceError(f"No such path: {path}")
+            raise WorkspaceError(f"Percorso inesistente: {path}")
         if target.is_file():
             return self.rel(target)
         lines: list[str] = []
         self._walk(target, depth, lines)
-        return "\n".join(lines) if lines else "(empty)"
+        return "\n".join(lines) if lines else "(vuoto)"
 
     def _walk(self, directory: Path, depth: int, out: list[str], prefix: str = "") -> None:
         if depth < 0:
@@ -80,7 +80,7 @@ class Workspace:
         try:
             entries = sorted(directory.iterdir(), key=lambda p: (p.is_file(), p.name))
         except PermissionError:
-            out.append(f"{prefix}[permission denied]")
+            out.append(f"{prefix}[permesso negato]")
             return
         for entry in entries:
             if entry.name in {".git", "__pycache__", ".venv", "node_modules", ".mini_agent"}:
@@ -93,22 +93,22 @@ class Workspace:
     def read(self, path: str, start: int = 1, end: int | None = None) -> str:
         target = self.resolve(path)
         if not target.exists():
-            raise WorkspaceError(f"No such file: {path}")
+            raise WorkspaceError(f"File inesistente: {path}")
         if target.is_dir():
-            raise WorkspaceError(f"{path} is a directory; use list_files")
+            raise WorkspaceError(f"{path} è una directory; usa list_files")
         try:
             text = target.read_text(encoding="utf-8", errors="replace")
         except OSError as exc:
-            raise WorkspaceError(f"Could not read {path}: {exc}") from exc
+            raise WorkspaceError(f"Impossibile leggere {path}: {exc}") from exc
 
         lines = text.splitlines()
         if start > 1 or end is not None:
             chunk = lines[start - 1 : end]
             numbered = [f"{i + start:>5}  {line}" for i, line in enumerate(chunk)]
-            return "\n".join(numbered) or "(no lines in range)"
+            return "\n".join(numbered) or "(nessuna riga nell'intervallo)"
         if len(text) > MAX_READ_CHARS:
             cut = text[:MAX_READ_CHARS]
-            return cut + f"\n\n[truncated: file is {len(text)} chars, showing {MAX_READ_CHARS}]"
+            return cut + f"\n\n[troncato: il file ha {len(text)} caratteri, mostrati {MAX_READ_CHARS}]"
         return text
 
     def search(self, pattern: str, path: str = ".", glob: str = "*", ignore_case: bool = False) -> str:
@@ -116,7 +116,7 @@ class Workspace:
         try:
             rx = re.compile(pattern, re.IGNORECASE if ignore_case else 0)
         except re.error as exc:
-            raise WorkspaceError(f"Bad regex {pattern!r}: {exc}") from exc
+            raise WorkspaceError(f"Regex non valida {pattern!r}: {exc}") from exc
 
         hits: list[str] = []
         files = [target] if target.is_file() else target.rglob(glob)
@@ -128,11 +128,11 @@ class Workspace:
                     if rx.search(line):
                         hits.append(f"{self.rel(file)}:{n}: {line.strip()[:200]}")
                         if len(hits) >= MAX_MATCHES:
-                            hits.append(f"[stopped at {MAX_MATCHES} matches]")
+                            hits.append(f"[fermato a {MAX_MATCHES} corrispondenze]")
                             return "\n".join(hits)
             except OSError:
                 continue
-        return "\n".join(hits) if hits else "(no matches)"
+        return "\n".join(hits) if hits else "(nessuna corrispondenza)"
 
     # -- writes ------------------------------------------------------------
     def write(self, path: str, content: str) -> str:
@@ -140,40 +140,40 @@ class Workspace:
         target = self.resolve(path)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
-        return f"Wrote {len(content)} chars to {self.rel(target)}"
+        return f"Scritti {len(content)} caratteri in {self.rel(target)}"
 
     def edit(self, path: str, old: str, new: str) -> str:
         """Replace exactly one occurrence. Ambiguity is an error, not a guess."""
         self._guard_write()
         target = self.resolve(path)
         if not target.exists():
-            raise WorkspaceError(f"No such file: {path}")
+            raise WorkspaceError(f"File inesistente: {path}")
         text = target.read_text(encoding="utf-8")
         count = text.count(old)
         if count == 0:
-            raise WorkspaceError(f"`old` string not found in {path}. Read the file again.")
+            raise WorkspaceError(f"Stringa `old` non trovata in {path}. Rileggi il file.")
         if count > 1:
             raise WorkspaceError(
-                f"`old` string appears {count} times in {path}. "
-                "Include more surrounding context to make it unique."
+                f"La stringa `old` compare {count} volte in {path}. "
+                "Includi più contesto circostante per renderla unica."
             )
         target.write_text(text.replace(old, new, 1), encoding="utf-8")
-        return f"Edited {self.rel(target)} (1 replacement)"
+        return f"Modificato {self.rel(target)} (1 sostituzione)"
 
     def delete(self, path: str) -> str:
         self._guard_write()
         target = self.resolve(path)
         if not target.exists():
-            raise WorkspaceError(f"No such file: {path}")
+            raise WorkspaceError(f"File inesistente: {path}")
         if target == self.root:
-            raise WorkspaceError("Refusing to delete the workspace root.")
+            raise WorkspaceError("Rifiuto di cancellare la radice del workspace.")
         if target.is_dir():
             import shutil
 
             shutil.rmtree(target)
         else:
             target.unlink()
-        return f"Deleted {self.rel(target)}"
+        return f"Cancellato {self.rel(target)}"
 
 
 def _skip(path: Path) -> bool:

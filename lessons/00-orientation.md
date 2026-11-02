@@ -1,149 +1,154 @@
-# 00 — Orientation
+# 00 — Orientamento
 
-> **Objectives**
-> - Define "coding agent" precisely enough to argue about it.
-> - Name the five components every agent has.
-> - Read a transcript and say what happened, in order.
+> **Obiettivi**
+> - Definire "agente di coding" in modo abbastanza preciso da poterne discutere.
+> - Nominare i cinque componenti che ogni agente possiede.
+> - Leggere una trascrizione e dire cosa è successo, in ordine.
 
-## The one-sentence definition
+## La definizione in una frase
 
-A coding agent is **a language model in a loop, with tools, inside an
-environment, under some budget, steered by a human.**
+Un agente di coding è **un modello linguistico in un ciclo, con strumenti, dentro
+un ambiente, sotto un budget, guidato da un umano.**
 
-Every word is load-bearing. Remove the loop and you have a chatbot. Remove the
-tools and you have a code explainer. Remove the environment and you have a
-text generator. Remove the budget and you have a runaway process. Remove the
-human and you have a very confident intern with root access.
+Ogni parola conta. Togli il ciclo e hai un chatbot. Togli gli strumenti e hai un
+commentatore di codice. Togli l'ambiente e hai un generatore di testo. Togli il
+budget e hai un processo fuori controllo. Togli l'umano e hai uno stagista
+molto sicuro di sé con accesso root.
 
-## What it is not
+## Cosa non è
 
-| Thing | Why it is not an agent |
+| Cosa | Perché non è un agente |
 |---|---|
-| Autocomplete | One prediction, no actions, no loop |
-| Chat assistant | Can talk about code, cannot run or change it |
-| "AI-powered IDE" | A product; may or may not contain an agent |
-| Workflow engine | Deterministic graph; the model is not choosing the path |
-| Agent *framework* | A library for building agents, not an agent |
+| Autocompletamento | Una sola previsione, nessuna azione, nessun ciclo |
+| Assistente chat | Parla di codice, non lo esegue né lo modifica |
+| "IDE potenziato dall'AI" | È un prodotto; può contenere o meno un agente |
+| Motore di workflow | Grafo deterministico; il modello non sceglie il percorso |
+| *Framework* per agenti | Una libreria per costruire agenti, non un agente |
 
-The distinction that matters: **who decides the next action?** In a workflow,
-a human wrote the graph. In an agent, the model chooses at each step, within
-bounds the harness sets.
+La distinzione che conta: **chi decide l'azione successiva?** In un workflow il
+grafo l'ha scritto un umano. In un agente il modello sceglie a ogni passo,
+entro i limiti fissati dall'harness.
 
-## The five components
+## I cinque componenti
 
 ```
             ┌──────────────────────────────────────────┐
-            │                  HUMAN                   │
-            │        task, approvals, review           │
+            │                  UMANO                   │
+            │      compito, approvazioni, revisione    │
             └───────────────────┬──────────────────────┘
                                 │
         ┌───────────────────────▼───────────────────────┐
         │                  HARNESS                      │
-        │  system prompt · context budget · loop ·      │
-        │  permissions · hooks · logging                │
+        │  system prompt · budget di contesto · ciclo · │
+        │  permessi · hook · logging                    │
         └───────┬───────────────────────────┬───────────┘
                 │                           │
       ┌─────────▼─────────┐       ┌─────────▼─────────┐
-      │       MODEL       │       │      TOOLS        │
-      │  next-token       │       │  read · edit ·    │
-      │  prediction       │       │  search · shell   │
+      │      MODELLO      │       │    STRUMENTI      │
+      │  previsione del   │       │  leggi · modifica │
+      │  token successivo │       │  cerca · shell    │
       └───────────────────┘       └─────────┬─────────┘
                                             │
                                   ┌─────────▼─────────┐
-                                  │   ENVIRONMENT     │
+                                  │     AMBIENTE      │
                                   │  repo, runtime,   │
-                                  │  network, secrets │
+                                  │  rete, segreti    │
                                   └───────────────────┘
 ```
 
-1. **Model** — stateless function: text in, text out. No memory between calls.
-2. **Harness** — the program around it. Owns the loop, the transcript, the
-   budget, and the guardrails. This is what you actually configure.
-3. **Tools** — the model's only way to affect the world. Described in text.
-4. **Environment** — the repo, the shell, the test suite, the credentials.
-5. **Human** — sets the task, approves risky actions, judges the result.
+1. **Modello** — funzione senza stato: testo in ingresso, testo in uscita.
+   Nessuna memoria tra una chiamata e l'altra.
+2. **Harness** — il programma attorno. Possiede il ciclo, la trascrizione, il
+   budget e i guardrail. È ciò che configuri davvero.
+3. **Strumenti** — l'unico modo che il modello ha di influire sul mondo.
+   Descritti in testo.
+4. **Ambiente** — la repo, la shell, la suite di test, le credenziali.
+5. **Umano** — imposta il compito, approva le azioni rischiose, giudica il
+   risultato.
 
-The harness is the part people underestimate. Two products with the same model
-can behave completely differently because their harnesses differ. When someone
-says "model X is better at coding", ask which harness they used.
+L'harness è la parte sottovalutata. Due prodotti con lo stesso modello possono
+comportarsi in modo completamente diverso perché i loro harness sono diversi.
+Quando qualcuno dice "il modello X è più bravo a programmare", chiedi con quale
+harness.
 
-## One run, step by step
+## Una singola esecuzione, passo per passo
 
-Task: *"The `parse_date` function crashes on empty input. Fix it."*
+Compito: *"La funzione `parse_date` va in crash su input vuoto. Correggila."*
 
 ```
-turn 1  model: I should find parse_date.        → search("def parse_date")
-        tool : src/dates.py:41: def parse_date(s):
-turn 2  model: Read it.                          → read_file("src/dates.py", 35, 55)
-        tool : [50 lines of code]
-turn 3  model: Add a guard.                      → edit_file(path, old, new)
-        tool : Edited src/dates.py (1 replacement)
-turn 4  model: Verify.                           → run_tests("tests/test_dates.py")
-        tool : FAILED test_empty_string
-turn 5  model: The test expects ValueError, not None. Fix the guard.
-                                                 → edit_file(...)
-turn 6  model: Verify again.                     → run_tests(...)
-        tool : 12 passed
-turn 7  model: Done. Guard added, tests pass.
+turno 1  modello: devo trovare parse_date.       → search("def parse_date")
+         tool   : src/dates.py:41: def parse_date(s):
+turno 2  modello: leggo il codice.                → read_file("src/dates.py", 35, 55)
+         tool   : [50 righe di codice]
+turno 3  modello: aggiungo un controllo.          → edit_file(path, old, new)
+         tool   : Edited src/dates.py (1 replacement)
+turno 4  modello: verifico.                       → run_tests("tests/test_dates.py")
+         tool   : FAILED test_empty_string
+turno 5  modello: il test si aspetta ValueError, non None. Correggo il controllo.
+                                                  → edit_file(...)
+turno 6  modello: verifico di nuovo.              → run_tests(...)
+         tool   : 12 passed
+turno 7  modello: fatto. Controllo aggiunto, test verdi.
 ```
 
-Seven model calls, four tool calls, one failed attempt. **The failure is the
-interesting part**: it is the loop, not the model, that turned a wrong first
-guess into a correct fix.
+Sette chiamate al modello, quattro chiamate agli strumenti, un tentativo
+fallito. **Il fallimento è la parte interessante**: è il ciclo, non il modello,
+che ha trasformato una prima ipotesi sbagliata in una correzione giusta.
 
-## Why the loop is the unit of design
+## Perché il ciclo è l'unità di progettazione
 
-A single model call cannot recover from its own mistake. A loop can, because
-the tool result re-enters the context and the model gets another chance. That
-is the entire value proposition — and also the entire risk, because a loop
-that cannot recognise failure will happily make things worse for twenty turns.
+Una singola chiamata al modello non può correggere i propri errori. Un ciclo sì,
+perché il risultato dello strumento rientra nel contesto e il modello ha una
+seconda possibilità. È tutto qui il valore — e anche tutto il rischio, perché un
+ciclo che non riconosce il fallimento peggiorerà le cose per venti turni.
 
-So the harness's job is to make failure *visible and cheap*:
+Quindi il compito dell'harness è rendere il fallimento **visibile ed economico**:
 
-- tool errors returned as text, not exceptions,
-- tests as ground truth,
-- turn and budget limits,
-- a transcript you can read afterwards.
+- errori degli strumenti restituiti come testo, non come eccezioni,
+- test come verità di riferimento,
+- limiti di turni e di budget,
+- una trascrizione che puoi rileggere dopo.
 
-## Where this course goes
+## Dove porta questo corso
 
-Modules 1–3 give you the primitives: tokens, the loop, tools. Modules 4–8
-build the machinery that makes agents usable: the filesystem, context
-management, instructions, skills, hooks. Modules 9–12 cover scale and safety.
-Modules 13–14 are practice and teams. Module 15 is a capstone where you build
-one.
+I moduli 1–3 danno le primitive: token, il ciclo, gli strumenti. I moduli 4–8
+costruiscono la macchina che rende gli agenti usabili: filesystem, gestione del
+contesto, istruzioni, skill, hook. I moduli 9–12 coprono scala e sicurezza. I
+moduli 13–14 sono pratica e team. Il modulo 15 è un progetto finale in cui ne
+costruisci uno.
 
-Everything is demonstrated in `mini_agent/`, about 2,000 lines of dependency-free
-Python. Read it alongside the lessons.
+Tutto è dimostrato in `mini_agent/`, circa 2.000 righe di Python senza
+dipendenze. Leggilo insieme alle lezioni.
 
-## Lab
+## Laboratorio
 
 ```bash
 python3 labs/L00_orientation.py
 ```
 
-The lab runs a scripted agent and prints the raw transcript. Your job is to
-annotate it: which messages came from the model, which from tools, and where
-the context grew.
+Il laboratorio esegue un agente con risposte preimpostate e stampa la
+trascrizione grezza. Il tuo compito è annotarla: quali messaggi vengono dal
+modello, quali dagli strumenti e dove è cresciuto il contesto.
 
-## ✅ Checkpoint
+## ✅ Verifica
 
-1. Why is a chat assistant that can "write code for you" not an agent?
-2. Name the five components and one failure mode of each.
-3. In the walkthrough above, what would have happened without the test tool?
-4. Why can two products with the same model behave differently?
-5. What is the harness's job when a tool fails?
+1. Perché un assistente chat che "ti scrive il codice" non è un agente?
+2. Nomina i cinque componenti e una modalità di fallimento di ciascuno.
+3. Nell'esempio sopra, cosa sarebbe successo senza lo strumento di test?
+4. Perché due prodotti con lo stesso modello possono comportarsi diversamente?
+5. Qual è il compito dell'harness quando uno strumento fallisce?
 
 <details>
-<summary>Answers</summary>
+<summary>Risposte</summary>
 
-1. It does not act. No tools, no loop, no environment changes.
-2. Model (hallucination, staleness), harness (bad context/limits), tools
-   (wrong schema, dangerous side effects), environment (missing deps, secrets),
-   human (vague task, rubber-stamping).
-3. The agent would have declared success after turn 3, with a fix that fails
-   the actual spec.
-4. Different harnesses: prompts, tools, context management, guardrails.
-5. Turn it into a message the model can read and react to, without crashing
-   the run.
+1. Non agisce. Niente strumenti, niente ciclo, nessuna modifica all'ambiente.
+2. Modello (allucinazione, obsolescenza), harness (contesto/limiti sbagliati),
+   strumenti (schema errato, effetti collaterali pericolosi), ambiente
+   (dipendenze mancanti, segreti), umano (compito vago, approvazione
+   automatica).
+3. L'agente avrebbe dichiarato successo dopo il turno 3, con una correzione che
+   non rispetta la specifica.
+4. Harness diversi: prompt, strumenti, gestione del contesto, guardrail.
+5. Trasformarlo in un messaggio che il modello può leggere e a cui può reagire,
+   senza far cadere l'esecuzione.
 </details>

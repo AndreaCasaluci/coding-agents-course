@@ -1,27 +1,30 @@
-"""The agent loop.
+"""Il ciclo dell'agente.
 
-This is the file to read twice. Everything else is a supporting cast.
+Questo è il file da leggere due volte. Tutto il resto è contorno.
 
     while turns < max_turns:
         reply = model(transcript, tools)
-        if reply has no tool calls:  done
-        for each call:
-            hook(pre_tool) -> allow?
+        if reply ha zero chiamate:  fine
+        per ogni chiamata:
+            hook(pre_tool) -> consentito?
             result = dispatch(call)
             hook(post_tool)
             transcript += result
         transcript = budget.enforce(transcript)
 
-Four things every real harness must get right, and most bugs live in:
+Quattro cose che ogni harness vero deve azzeccare, e dove vive la maggior parte
+dei bug:
 
-1. **Transcript integrity.** Every assistant tool call needs exactly one tool
-   result with the same id, in order. Violate this and the API rejects you.
-2. **Termination.** A model that keeps calling tools will run forever. Bound
-   turns *and* budget.
-3. **Failure containment.** A tool error becomes a message, not an exception.
-   A denied action becomes a message the model can react to.
-4. **Observability.** You cannot debug what you did not record. Every turn is
-   kept, including the denials.
+1. **Integrità della trascrizione.** Ogni chiamata dell'assistente ha bisogno di
+   esattamente un risultato con lo stesso id, in ordine. Violalo e l'API ti
+   rifiuta.
+2. **Terminazione.** Un modello che continua a chiamare strumenti gira per
+   sempre. Limita turni *e* budget.
+3. **Contenimento dei fallimenti.** Un errore di uno strumento diventa un
+   messaggio, non un'eccezione. Un'azione negata diventa un messaggio a cui il
+   modello può reagire.
+4. **Osservabilità.** Non puoi fare debug di ciò che non hai registrato. Ogni
+   turno viene conservato, inclusi i rifiuti.
 """
 
 from __future__ import annotations
@@ -40,17 +43,23 @@ from .skills import SkillLibrary
 from .tools import Tool, ToolRegistry
 from .workspace import Workspace
 
-SYSTEM_TEMPLATE = """You are a coding agent operating inside a workspace.
+SYSTEM_TEMPLATE = """Sei un agente di coding che opera dentro un workspace.
 
-Workspace root: {root}
+Radice del workspace: {root}
 
-How to work:
-- Inspect before you act. Read a file before editing it; never invent contents.
-- Make the smallest change that solves the task. Do not refactor unasked.
-- Prefer `edit_file` (unique-string replacement) over rewriting whole files.
-- Verify your work: run tests or re-read the changed region before declaring done.
-- If a tool is denied or fails, read the message and adapt. Do not retry blindly.
-- When the task is complete, reply with a short summary of what changed.
+Come lavorare:
+- Ispeziona prima di agire. Leggi un file prima di modificarlo; non inventare
+  contenuti.
+- Fai la modifica più piccola che risolve il compito. Non fare refactoring non
+  richiesto.
+- Preferisci `edit_file` (sostituzione di una stringa unica) alla riscrittura di
+  interi file.
+- Verifica il lavoro: esegui i test o rileggi la regione modificata prima di
+  dichiarare finito.
+- Se uno strumento viene negato o fallisce, leggi il messaggio e adattati. Non
+  riprovare alla cieca.
+- Quando il compito è completo, rispondi con un breve riassunto di cosa è
+  cambiato.
 {instructions}{skills}"""
 
 
@@ -100,7 +109,8 @@ class Agent:
         self.system_extra = system_extra
         self.on_event = on_event or (lambda event, payload: None)
 
-        # Attach skill loading as tools so disclosure is a model decision (L2).
+        # Aggancia il caricamento delle skill come strumenti, così la
+        # divulgazione è una decisione del modello (L2).
         if len(self.skills):
             from .skill_tools import make_skill_tools
 
@@ -108,9 +118,9 @@ class Agent:
                 if self.tools.get(t.name) is None:
                     self.tools.register(t)
 
-    # -- construction helpers ---------------------------------------------
+    # -- helper di costruzione --------------------------------------------
     def fork(self, name: str = "subagent") -> "Agent":
-        """A sibling with the same configuration and a clean transcript."""
+        """Un fratello con la stessa configurazione e una trascrizione pulita."""
         return Agent(
             self.llm,
             self.tools,
@@ -128,18 +138,18 @@ class Agent:
     def system_prompt(self) -> str:
         instructions = ""
         if self.instructions.items:
-            instructions = "\n\n# Project instructions\n\n" + self.instructions.render()
+            instructions = "\n\n# Istruzioni del progetto\n\n" + self.instructions.render()
 
         skills = ""
         if len(self.skills):
             skills = (
-                "\n\n# Available skills\n\n"
-                "Call `load_skill` before doing work that matches one of these:\n"
+                "\n\n# Skill disponibili\n\n"
+                "Chiama `load_skill` prima di fare un lavoro che corrisponde a una di queste:\n"
                 + self.skills.catalog()
             )
 
         prompt = SYSTEM_TEMPLATE.format(
-            root=self.workspace.root if self.workspace else "(none)",
+            root=self.workspace.root if self.workspace else "(nessuno)",
             instructions=instructions,
             skills=skills,
         )
@@ -147,7 +157,7 @@ class Agent:
             prompt += "\n\n" + self.system_extra
         return prompt
 
-    # -- the loop ----------------------------------------------------------
+    # -- il ciclo ----------------------------------------------------------
     def run(self, task: str, history: Sequence[Message] | None = None) -> RunResult:
         self.hooks.emit(hook_events.SESSION_START, {"agent": self.name, "task": task})
 
@@ -164,7 +174,7 @@ class Agent:
 
         try:
             for turns in range(1, self.max_turns + 1):
-                # Budget is enforced *before* the call, never after.
+                # Il budget si applica *prima* della chiamata, mai dopo.
                 messages = self.budget.enforce(messages, compact=summarize_naive)
                 self.on_event("turn_start", {"turn": turns, "tokens": transcript_tokens(messages)})
 
@@ -191,7 +201,7 @@ class Agent:
             else:
                 turns = self.max_turns
                 stopped = "max_turns"
-        except Exception as exc:  # model or transport failure
+        except Exception as exc:  # guasto del modello o del trasporto
             stopped = "error"
             error = f"{type(exc).__name__}: {exc}"
             self.hooks.emit(hook_events.SESSION_END, {"agent": self.name, "error": error})
@@ -216,7 +226,7 @@ class Agent:
             tool_calls=tool_calls_made,
         )
 
-    # -- one tool call, with hooks ----------------------------------------
+    # -- una chiamata a uno strumento, con gli hook ------------------------
     def _execute(self, call: ToolCall) -> Message:
         payload = {
             "agent": self.name,
@@ -266,7 +276,7 @@ def build_agent(
     audit_path: Path | None = None,
     verbose: bool = False,
 ) -> Agent:
-    """Wire the standard harness: fs tools + instructions + skills + safe hooks."""
+    """Collega l'harness standard: strumenti fs + istruzioni + skill + hook sicuri."""
     from .hooks import deny_paths, redact_secrets
     from .instructions import discover
     from .llm import default_llm
@@ -276,7 +286,7 @@ def build_agent(
     ws = Workspace(root, read_only=read_only)
     hooks = HookBus()
 
-    # Deterministic guards: prompts cannot guarantee these.
+    # Guardrail deterministici: i prompt non possono garantirli.
     hooks.on(hook_events.PRE_EDIT, deny_paths((".env", ".git", "secrets", "node_modules")), name="protect-paths")
     hooks.on(hook_events.POST_TOOL, redact_secrets(), name="redact-secrets")
 

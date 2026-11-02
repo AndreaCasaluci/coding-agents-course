@@ -1,8 +1,8 @@
-"""Capstone eval suite.
+"""Suite di eval del progetto finale.
 
-Grading is on the workspace and the report — never on the transcript.
+La valutazione riguarda il workspace e il report — mai la trascrizione.
 
-Run: python3 -m capstone.repo_doctor --eval
+Esegui: python3 -m capstone.repo_doctor --eval
 """
 
 from __future__ import annotations
@@ -86,8 +86,8 @@ CASES = [
             "tests/test_app.py": "from src.app import main\n\ndef test_main():\n    assert main() == 0\n",
         }),
         check=lambda result, ws: (
-            "no major issues" in _report(ws).lower()
-            or f"false alarm on a clean repo:\n{_report(ws)[:200]}"
+            "nessun problema rilevante" in _report(ws).lower()
+            or f"falso allarme su una repo pulita:\n{_report(ws)[:200]}"
         ),
     ),
     EvalCase(
@@ -121,12 +121,12 @@ def run_all() -> int:
     print(report(results))
     failures = [r for r in results if not r.passed]
     if failures:
-        print("\nFailures:")
+        print("\nFallimenti:")
         for failure in failures:
             print(f"\n--- {failure.name} ---\n{failure.detail}")
             print(failure.transcript[:2_000])
         return 1
-    print("\nAll capstone evals passed.")
+    print("\nTutte le eval del progetto finale sono passate.")
     return 0
 
 

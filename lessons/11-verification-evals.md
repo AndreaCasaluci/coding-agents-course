@@ -1,176 +1,180 @@
-# 11 — Verification & Evals
+# 11 — Verifica ed eval
 
-> **Objectives**
-> - Build a verification ladder and know which rung you are on.
-> - Design an eval that measures outcomes, not vibes.
-> - Report pass@k honestly.
+> **Obiettivi**
+> - Costruire una scala di verifica e sapere a che gradino sei.
+> - Progettare un'eval che misura i risultati, non le impressioni.
+> - Riportare pass@k con onestà.
 
-## The core asymmetry
+## L'asimmetria centrale
 
-A model's claim of success is **text**. A test result is **evidence**. Agents
-are fluent at the first and only occasionally produce the second on their own.
+L'affermazione di successo di un modello è **testo**. Il risultato di un test è
+**prova**. Gli agenti sono fluenti nella prima e producono la seconda solo
+occasionalmente da soli.
 
-So the harness's most valuable job is not generating code. It is **creating
-cheap, unambiguous signals of failure** that the loop can act on.
+Quindi il compito più prezioso dell'harness non è generare codice. È **creare
+segnali di fallimento economici e non ambigui** su cui il ciclo possa agire.
 
 ```
-model says "done"  ──►  is that true?
-                          │
-                          ├─ no signal     → you are trusting prose
-                          └─ test result   → you are engineering
+il modello dice "fatto"  ──►  è vero?
+                                │
+                                ├─ nessun segnale  → ti fidi della prosa
+                                └─ risultato test  → stai facendo ingegneria
 ```
 
-## The verification ladder
+## La scala della verifica
 
-Cheapest and most reliable first:
+Dal più economico e affidabile:
 
-| Rung | Signal | Catches | Misses |
+| Gradino | Segnale | Cattura | Non cattura |
 |---|---|---|---|
-| 1 | parses / compiles | syntax errors | everything else |
-| 2 | linter | style, obvious bugs | logic |
-| 3 | type checker | interface mismatches | runtime behaviour |
-| 4 | unit tests | specified behaviour | integration, spec gaps |
-| 5 | integration / e2e | wiring, real I/O | performance, UX |
-| 6 | manual review of the diff | intent, design | scale |
+| 1 | parsing / compilazione | errori di sintassi | tutto il resto |
+| 2 | linter | stile, bug ovvi | logica |
+| 3 | type checker | disallineamenti di interfaccia | comportamento a runtime |
+| 4 | test unitari | comportamento specificato | integrazione, buchi nella specifica |
+| 5 | integrazione / e2e | cablaggio, I/O reale | prestazioni, UX |
+| 6 | revisione manuale del diff | intento, design | scala |
 
-An agent with rungs 1–4 in its tool loop will self-correct most mistakes. An
-agent with none will confidently ship broken code.
+Un agente con i gradini 1–4 nel ciclo si autocorreggerà per la maggior parte
+degli errori. Un agente senza nessuno rilascerà codice rotto con sicurezza.
 
-**The highest-leverage thing you can do for agent quality is make the test
-suite fast and runnable by the agent.** Not a better model. A 2-second test
-suite changes behaviour; a 10-minute one gets skipped.
+**La cosa a più alto impatto che puoi fare per la qualità dell'agente è rendere
+la suite di test veloce ed eseguibile dall'agente.** Non un modello migliore. Una
+suite da 2 secondi cambia il comportamento; una da 10 minuti viene saltata.
 
-## Self-review is weak; external review is not
+## L'autorevisione è debole; la revisione esterna no
 
-"Review your own change" mostly produces reassurance. The model has already
-committed to a plan and will rationalise it.
+"Rivedi la tua modifica" produce soprattutto rassicurazione. Il modello si è già
+impegnato su un piano e lo razionalizzerà.
 
-What works:
+Cosa funziona:
 
-- **Run something** that can contradict it (tests, typechecker, a second
-  opinion model with a fresh context — module 09).
-- **Ask for a diff review with a rubric**: correctness, edge cases, security,
-  test coverage, scope creep. Specific categories produce specific findings.
-- **Require evidence in the answer**: "paste the command and its output".
+- **Esegui qualcosa** che possa contraddirlo (test, typechecker, un secondo
+  modello con contesto pulito — modulo 09).
+- **Chiedi una revisione del diff con una rubrica**: correttezza, casi limite,
+  sicurezza, copertura dei test, scope creep. Categorie specifiche producono
+  risultati specifici.
+- **Pretendi prove nella risposta**: "incolla il comando e il suo output".
 
-## Eval anatomy
+## Anatomia di un'eval
 
-An eval is three things:
+Un'eval è tre cose:
 
 ```python
 EvalCase(
     name="fix empty-date crash",
-    task="parse_date('') crashes. Fix it without changing the signature.",
+    task="parse_date('') va in crash. Correggila senza cambiare la firma.",
     setup=lambda ws: seed_repo(ws),
-    check=lambda result, ws: run_tests(ws) or "tests still failing",
+    check=lambda result, ws: run_tests(ws) or "i test falliscono ancora",
 )
 ```
 
-1. **Task** — a self-contained instruction.
-2. **Environment** — a *fresh* workspace, seeded identically every time.
-3. **Grader** — a function over the outcome (files, test results), not the
-   transcript.
+1. **Compito** — un'istruzione autosufficiente.
+2. **Ambiente** — un workspace *nuovo*, inizializzato allo stesso modo ogni
+   volta.
+3. **Valutatore** — una funzione sul risultato (file, esito dei test), non sulla
+   trascrizione.
 
-That last point is the most common mistake. Grading `"did it call edit_file?"`
-rewards mimicry. Grading `"do the tests pass?"` rewards the result.
+Quest'ultimo è l'errore più comune. Valutare `"ha chiamato edit_file?"` premia
+l'imitazione. Valutare `"passano i test?"` premia il risultato.
 
-## Rules that make evals trustworthy
+## Regole che rendono affidabili le eval
 
-| Rule | Why |
+| Regola | Perché |
 |---|---|
-| Fresh state per case | Otherwise you test execution order |
-| Grade outcomes | Transcripts are brittle and gameable |
-| Include a case the agent should **refuse** | Catches over-eagerness |
-| Include a **no-op** case | Catches unnecessary changes |
-| Pin the model and settings | Otherwise the number is meaningless |
-| Run k times | Non-determinism means one run is noise |
-| Keep a held-out set | Otherwise you overfit prompts to the eval |
+| Stato nuovo per ogni caso | Altrimenti testi l'ordine di esecuzione |
+| Valuta i risultati | Le trascrizioni sono fragili e aggirabili |
+| Includi un caso in cui l'agente deve **rifiutare** | Cattura l'eccesso di zelo |
+| Includi un caso **no-op** | Cattura le modifiche inutili |
+| Fissa modello e impostazioni | Altrimenti il numero non significa nulla |
+| Esegui k volte | Il non determinismo rende una singola esecuzione rumore |
+| Tieni un set di riserva | Altrimenti fai overfitting dei prompt sull'eval |
 
-## pass@k, and why one green run lies
+## pass@k, e perché un'esecuzione verde mente
 
-If an agent succeeds 70% of the time, a single run is a coin flip that lands
-heads most days. Report:
-
-```
-pass@1 = 0.70     pass@3 = 0.97     pass@5 = 0.998
-```
-
-For coding agents, the number that matters is usually **pass@1 with retries
-disabled** — that is what your CI will experience. pass@k with k retries is
-what a human in the loop experiences.
-
-## Flaky evals
-
-An eval that passes and fails without code changes is worse than no eval: it
-teaches you to ignore failures.
-
-Common causes:
-
-- shared temp directories or ports,
-- time/date dependence,
-- network calls,
-- ordering assumptions,
-- non-deterministic model temperature,
-- a grader that depends on the transcript.
-
-Quarantine flaky cases, then fix the environment. Never "just retry" in CI
-without recording it.
-
-## Regression suites
-
-The eval suite grows from incidents:
+Se un agente riesce il 70% delle volte, una singola esecuzione è un lancio di
+moneta che il più delle volte esce testa. Riporta:
 
 ```
-bug found in production
-  → write an eval that reproduces it
-  → fix the agent/prompt/tool
-  → the eval stays forever
+pass@1 = 0,70     pass@3 = 0,97     pass@5 = 0,998
 ```
 
-This is exactly how test suites grow, and it works for the same reason: it
-turns a one-off failure into a permanent guard.
+Per gli agenti di coding il numero che conta è di solito **pass@1 senza
+retry** — è ciò che la tua CI sperimenterà. pass@k con k tentativi è ciò che
+sperimenta un umano nel ciclo.
 
-## Metrics that are not vanity
+## Eval instabili
 
-| Metric | What it tells you |
+Un'eval che passa e fallisce senza modifiche al codice è peggio di nessuna eval:
+ti insegna a ignorare i fallimenti.
+
+Cause comuni:
+
+- directory temporanee o porte condivise,
+- dipendenza da data/ora,
+- chiamate di rete,
+- assunzioni sull'ordine,
+- temperatura del modello non deterministica,
+- un valutatore che dipende dalla trascrizione.
+
+Metti in quarantena i casi instabili, poi correggi l'ambiente. Non fare mai "solo
+un retry" in CI senza registrarlo.
+
+## Suite di regressione
+
+La suite di eval cresce dagli incidenti:
+
+```
+bug trovato in produzione
+  → scrivi un'eval che lo riproduce
+  → correggi agente/prompt/strumento
+  → l'eval resta per sempre
+```
+
+È esattamente come crescono le suite di test, e funziona per lo stesso motivo:
+trasforma un fallimento isolato in un guardrail permanente.
+
+## Metriche non vanitose
+
+| Metrica | Cosa ti dice |
 |---|---|
-| pass@1 on a fixed suite | capability |
-| turns per success | efficiency |
-| tokens per success | cost |
-| human edits after the agent | quality gap |
-| revert rate | real-world correctness |
-| time to first useful diff | latency |
-| % sessions abandoned | usability |
+| pass@1 su una suite fissa | capacità |
+| turni per successo | efficienza |
+| token per successo | costo |
+| modifiche umane dopo l'agente | divario di qualità |
+| tasso di revert | correttezza nel mondo reale |
+| tempo al primo diff utile | latenza |
+| % di sessioni abbandonate | usabilità |
 
-"Lines of code generated" is not on the list. It measures the wrong thing.
+"Righe di codice generate" non è nella lista. Misura la cosa sbagliata.
 
-## Lab
+## Laboratorio
 
 ```bash
 python3 labs/L11_evals.py
 ```
 
-You will build a three-case eval suite (a fix, a no-op, a refusal), run it
-against two scripted models, and see one pass and one fail — then compute
-pass@k on a flaky policy.
+Costruirai una suite di tre casi (una correzione, un no-op, un rifiuto), la
+eseguirai contro due modelli preimpostati e vedrai uno passare e uno fallire —
+poi calcolerai pass@k su una policy instabile.
 
-🔬 **Break it:** grade on `result.tool_calls` instead of the workspace and watch
-a wrong-but-plausible agent pass.
+🔬 **Fallo fallire:** valuta su `result.tool_calls` invece che sul workspace e
+guarda un agente sbagliato ma plausibile passare.
 
-## ✅ Checkpoint
+## ✅ Verifica
 
-1. Why is a model's "done" not evidence?
-2. Name the verification ladder from cheapest to strongest.
-3. Why must evals grade outcomes, not transcripts?
-4. Why is one green run not a result?
-5. What makes an eval flaky, and why is that worse than no eval?
+1. Perché il "fatto" di un modello non è una prova?
+2. Nomina la scala della verifica dal più economico al più forte.
+3. Perché le eval devono valutare i risultati, non le trascrizioni?
+4. Perché un'esecuzione verde non è un risultato?
+5. Cosa rende instabile un'eval, e perché è peggio di nessuna eval?
 
 <details>
-<summary>Answers</summary>
+<summary>Risposte</summary>
 
-1. It is unverified text; only environment observations are evidence.
-2. Compile → lint → types → unit → integration → manual review.
-3. Transcripts are brittle and reward mimicry; outcomes measure the result.
-4. Non-determinism: you need k runs and a pass@k number.
-5. Shared state, time, network, ordering; it trains you to ignore failures.
+1. È testo non verificato; solo le osservazioni dell'ambiente sono prove.
+2. Compila → lint → tipi → unit → integrazione → revisione manuale.
+3. Le trascrizioni sono fragili e premiano l'imitazione; i risultati misurano
+   l'esito.
+4. Non determinismo: servono k esecuzioni e un numero pass@k.
+5. Stato condiviso, tempo, rete, ordine; ti abitua a ignorare i fallimenti.
 </details>

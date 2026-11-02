@@ -1,79 +1,78 @@
-# Glossary
+# Glossario
 
-Terms are defined as this course uses them. Where the industry is inconsistent,
-the most common meaning wins and the alternative is noted.
+I termini sono definiti come li usa questo corso. Dove il settore è incoerente,
+vince il significato più comune e l'alternativa viene segnalata.
 
-**Agent** — A system that repeatedly calls a language model, lets it act
-through tools, and feeds the results back, until a stopping condition is met.
-A chatbot with one model call is not an agent. The loop is what makes it one.
+**Agente** — Un sistema che chiama ripetutamente un modello linguistico, lo lascia agire
+tramite gli strumenti e rimanda indietro i risultati, finché non si raggiunge una condizione
+di stop. Un chatbot con una sola chiamata al modello non è un agente. È il ciclo a renderlo tale.
 
-**Agent loop** — The cycle of *model call → tool call(s) → observation →
-model call*. Also called the ReAct loop, after the 2022 paper, though every
-implementation differs.
+**Ciclo dell'agente** — Il ciclo *chiamata al modello → chiamata/e agli strumenti → osservazione →
+chiamata al modello*. Chiamato anche ciclo ReAct, dal paper del 2022, anche se ogni
+implementazione è diversa.
 
-**AGENTS.md** — A convention for a Markdown file at a repo root (or in
-subdirectories) holding instructions for coding agents. Read automatically by
-many tools; the closest thing to a cross-vendor standard for agent context.
+**AGENTS.md** — Una convenzione per un file Markdown nella radice di una repo (o nelle
+sottocartelle) che contiene istruzioni per gli agenti di coding. Letto automaticamente da
+molti strumenti; la cosa più vicina a uno standard cross-vendor per il contesto dell'agente.
 
-**Allowlist** — The set of commands, paths, or tools an agent may use without
-asking. Everything else is denied or prompts the human.
+**Allowlist** — L'insieme di comandi, percorsi o strumenti che un agente può usare senza
+chiedere. Tutto il resto è negato o richiede l'intervento umano.
 
-**Context window** — The maximum number of tokens a model can attend to in one
-call, counting system prompt, history, tool results, and the reply. Not memory;
-it is recomputed (or cached) every call.
+**Finestra di contesto** — Il numero massimo di token a cui un modello può prestare attenzione in una
+chiamata, contando system prompt, cronologia, risultati degli strumenti e la risposta. Non è memoria;
+viene ricalcolata (o messa in cache) a ogni chiamata.
 
-**Compaction** — Replacing old conversation with a summary so the run can
-continue past the context limit. Lossy by definition, which is why it is a
-source of subtle bugs.
+**Compaction** — Sostituire la vecchia conversazione con un riassunto così che l'esecuzione possa
+proseguire oltre il limite di contesto. Per definizione introduce perdita, ed è per questo che è una
+fonte di bug sottili.
 
-**Eval** — A repeatable test of agent behaviour: a task, an environment, and a
-grader. The agent equivalent of a unit test, but with a non-deterministic
-subject.
+**Eval** — Un test ripetibile del comportamento dell'agente: un task, un ambiente e un
+valutatore. L'equivalente dell'unit test per un agente, ma con un soggetto non deterministico.
 
-**Function calling / tool calling** — The model emitting a structured request
-("call `read_file` with `{"path": "a.py"}`") that the harness executes. The
-model never executes anything itself.
+**Function calling / tool calling** — Il modello che emette una richiesta strutturata
+("chiama `read_file` con `{"path": "a.py"}`") che l'harness esegue. Il
+modello non esegue mai nulla da solo.
 
-**Hook** — A user-defined handler bound to a lifecycle event (before a tool
-runs, after an edit, on session start). Hooks are code, not prompts, so they
-are deterministic.
+**Hook** — Un gestore definito dall'utente, legato a un evento del ciclo di vita (prima che uno strumento
+venga eseguito, dopo una modifica, all'avvio della sessione). Gli hook sono codice, non prompt, quindi
+sono deterministici.
 
-**MCP (Model Context Protocol)** — A JSON-RPC-based protocol for exposing
-tools, resources, and prompts to agents over a standard interface, so one
-server works with many clients.
+**MCP (Model Context Protocol)** — Un protocollo basato su JSON-RPC per esporre
+strumenti, risorse e prompt agli agenti tramite un'interfaccia standard, così che un
+server funzioni con molti client.
 
-**Prompt injection** — Instructions hidden in content the agent reads (a file,
-a web page, a tool result) that redirect its behaviour. The central unsolved
-security problem for agents.
+**Prompt injection** — Istruzioni nascoste nel contenuto che l'agente legge (un file,
+una pagina web, un risultato di uno strumento) che ne dirottano il comportamento. Il principale problema
+di sicurezza irrisolto per gli agenti.
 
-**Progressive disclosure** — Loading only a small description of a skill or
-tool up front, and its full content only when needed. The main technique for
-keeping large capability sets inside a context budget.
+**Divulgazione progressiva** — Caricare solo una piccola descrizione di una skill o di uno
+strumento all'inizio, e il suo contenuto completo solo quando serve. La tecnica principale per
+tenere grandi insiemi di capacità dentro un budget di contesto.
 
-**Sandbox** — An enforced boundary around what the agent can touch: a
-container, a worktree, a path jail, a permission profile. Enforcement is
-outside the model.
+**Sandbox** — Un confine imposto su ciò che l'agente può toccare: un
+container, un worktree, un path jail, un profilo di permessi. L'imposizione è
+fuori dal modello.
 
-**Skill** — A packaged, discoverable procedure (usually a folder with a
-`SKILL.md` and optional scripts/resources) that an agent loads when a task
-matches its description.
+**Skill** — Una procedura impacchettata e scopribile (di solito una cartella con un
+`SKILL.md` e script/risorse opzionali) che un agente carica quando un task
+corrisponde alla sua descrizione.
 
-**Subagent** — A separate agent run, usually with its own context window,
-spawned by a parent agent for a subtask. Returns a summary, not its full
-transcript.
+**Subagente** — Un'esecuzione separata dell'agente, di solito con la propria finestra di contesto,
+generata da un agente padre per un sotto-task. Restituisce un riassunto, non la sua intera
+trascrizione.
 
-**System prompt** — The harness-supplied instructions that frame every call:
-identity, rules, tool guidance. Not user-editable in most products, but the
-first thing to understand when behaviour seems wrong.
+**System prompt** — Le istruzioni fornite dall'harness che inquadrano ogni chiamata:
+identità, regole, indicazioni sugli strumenti. Nella maggior parte dei prodotti non è modificabile dall'utente, ma è
+la prima cosa da capire quando il comportamento sembra sbagliato.
 
-**Token** — A subword unit of text. Roughly 4 characters of English, but code
-and non-English text are less efficient. All limits and costs are in tokens.
+**Token** — Un'unità di testo più piccola della parola. Circa 4 caratteri di inglese, ma il codice
+e il testo non inglese sono meno efficienti. Tutti i limiti e i costi sono in token.
 
-**Tool** — A capability exposed to the model as a name, a description, and a
-JSON schema. The description is prompt text: it changes behaviour.
+**Strumento** — Una capacità esposta al modello come nome, descrizione e
+schema JSON. La descrizione è testo di prompt: cambia il comportamento.
 
-**Turn** — One model call plus the tool executions it requested. A task is many
-turns.
+**Turno** — Una chiamata al modello più le esecuzioni degli strumenti che ha richiesto. Un task è fatto di molti
+turni.
 
-**Worktree** — A separate checkout of a repo on its own branch, sharing the
-same object store. Cheap isolation for parallel agent runs.
+**Worktree** — Un checkout separato di una repo sul proprio branch, che condivide lo
+stesso object store. Isolamento economico per esecuzioni parallele degli agenti.

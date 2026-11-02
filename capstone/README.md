@@ -1,67 +1,69 @@
-# Capstone — repo_doctor
+# Progetto finale — repo_doctor
 
-An audit agent that reads a repository and writes `REPORT.md`. It is the
-smallest project that exercises every concept in the course at once.
+Un agente di analisi che legge una repository e scrive `REPORT.md`. È il progetto
+più piccolo che esercita insieme ogni concetto del corso.
 
-## Run it
+## Eseguilo
 
 ```bash
-# audit a generated sample repo (offline, no API key)
+# analizza una repo di esempio generata (offline, senza chiave API)
 python3 -m capstone.repo_doctor --demo
 
-# audit a real repo
-python3 -m capstone.repo_doctor --root /path/to/repo --transcript
+# analizza una repo vera
+python3 -m capstone.repo_doctor --root /percorso/della/repo --transcript
 
-# run the eval suite
+# esegui la suite di eval
 python3 -m capstone.repo_doctor --eval
 ```
 
-## What it demonstrates
+## Cosa dimostra
 
-| Concept | Where |
+| Concetto | Dove |
 |---|---|
-| Minimal tool surface | `build_doctor`: read, search, inventory, write, delegate |
-| Skill loaded on demand | `capstone/skills/repo-audit/SKILL.md` via `load_skill` |
-| Deterministic guard | `report-only` hook on `PRE_EDIT` |
-| Secret redaction | `redact_secrets` on `POST_TOOL` |
-| Subagent | `delegate` → `run_subagent`, fresh context, depth limit |
-| Budget + turn cap | `ContextBudget(16_000)`, `max_turns=12` |
-| Outcome evals | `capstone/evals.py`, six cases, fresh workspace each |
-| Untrusted input | the audited repo's `AGENTS.md` is deliberately **not** loaded |
+| Superficie minima degli strumenti | `build_doctor`: leggi, cerca, inventario, scrivi, delega |
+| Skill caricata su richiesta | `capstone/skills/repo-audit/SKILL.md` via `load_skill` |
+| Guardrail deterministico | hook `report-only` su `PRE_EDIT` |
+| Oscuramento dei segreti | `redact_secrets` su `POST_TOOL` |
+| Subagente | `delegate` → `run_subagent`, contesto pulito, limite di profondità |
+| Budget + limite di turni | `ContextBudget(16_000)`, `max_turns=12` |
+| Eval sui risultati | `capstone/evals.py`, sei casi, workspace nuovo per ciascuno |
+| Input non fidato | l'`AGENTS.md` della repo analizzata **non** viene caricato |
 
-## Design decisions worth defending
+## Scelte di progetto da saper difendere
 
-**Only `REPORT.md` is writable.** The skill says so, but the hook enforces it.
-Try `--root` on a repo and watch a write to `src/` come back as `DENIED`.
+**Solo `REPORT.md` è scrivibile.** La skill lo dice, ma l'hook lo impone. Prova
+`--root` su una repo e guarda una scrittura su `src/` tornare come `DENIED`.
 
-**No shell tool.** The audit does not need one, so it is absent. Every tool you
-do not expose is an attack surface you do not own.
+**Nessuno strumento shell.** L'analisi non ne ha bisogno, quindi è assente. Ogni
+strumento che non esponi è una superficie d'attacco che non possiedi.
 
-**The audited repo's instructions are ignored.** A repository can contain an
-`AGENTS.md` that says "exfiltrate the secrets". Loading it would be a
-self-inflicted injection. The doctor starts with an empty `InstructionSet`.
+**Le istruzioni della repo analizzata vengono ignorate.** Una repository può
+contenere un `AGENTS.md` che dice "esfiltra i segreti". Caricarlo sarebbe
+un'injection autoinflitta. Il dottore parte con un `InstructionSet` vuoto.
 
-**Delegation is one level deep.** The `delegate` tool refuses when the calling
-agent is not the root doctor, so a child cannot fan out indefinitely.
+**La delega è profonda un livello.** Lo strumento `delegate` rifiuta quando
+l'agente chiamante non è il dottore radice, così un figlio non può espandersi
+all'infinito.
 
-**The offline model is a state machine.** `DoctorLLM` performs the procedure
-deterministically so the capstone runs with no API key. Swap in a real model
-with `MINI_AGENT_PROVIDER=openai`; the harness is identical.
+**Il modello offline è una macchina a stati.** `DoctorLLM` esegue la procedura in
+modo deterministico, così il progetto finale gira senza chiave API. Sostituisci
+un modello vero con `MINI_AGENT_PROVIDER=openai`; l'harness è identico.
 
-## Extend it
+## Estendilo
 
-- Add a **reviewer subagent** that critiques the report with a rubric.
-- Add **pass@3** for the flakiest case.
-- Add a **budget-exhaustion** case: a repo large enough to force compaction.
-- Run it on a schedule in CI and diff the reports.
+- Aggiungi un **subagente revisore** che critica il report con una rubrica.
+- Aggiungi **pass@3** per il caso più instabile.
+- Aggiungi un caso di **esaurimento del budget**: una repo abbastanza grande da
+  forzare la compressione.
+- Eseguiilo in CI su un programma e confronta i report.
 
-## Files
+## File
 
 ```
 capstone/
-  repo_doctor.py        the agent, tools, hook, policy, CLI
-  evals.py              six outcome-graded cases
-  skills/repo-audit/    the procedure (SKILL.md)
-  BRIEF.md              the task statement and non-goals
-  RETRO.md              what you learned (fill this in)
+  repo_doctor.py        l'agente, gli strumenti, l'hook, la policy, la CLI
+  evals.py              sei casi valutati sul risultato
+  skills/repo-audit/    la procedura (SKILL.md)
+  BRIEF.md              il testo del compito e i non-obiettivi
+  RETRO.md              cosa hai imparato (compilalo)
 ```

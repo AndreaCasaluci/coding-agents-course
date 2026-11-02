@@ -1,35 +1,35 @@
 # AGENTS.md
 
-Instructions for coding agents working in this repository.
+Istruzioni per gli agenti di coding che lavorano in questa repository.
 
-## Commands
+## Comandi
 
 - Test: `python3 run.py test`
-- All labs: `python3 run.py labs`
-- Lint (compile check): `python3 run.py lint`
-- Run the agent: `python3 -m mini_agent "<task>" --root .`
+- Tutti i laboratori: `python3 run.py labs`
+- Lint (controllo di compilazione): `python3 run.py lint`
+- Esegui l'agente: `python3 -m mini_agent "<task>" --root .`
 
-No third-party dependencies. Python 3.10+.
+Nessuna dipendenza di terze parti. Python 3.10+.
 
-## Invariants
+## Invarianti
 
-- `mini_agent/` is teaching code: prefer clarity over cleverness, and keep
-  modules small enough to read in one sitting.
-- Every lab (`labs/L*.py`) must run standalone and exit 0.
-- Every module in `lessons/` maps to a lab and a `mini_agent` module.
-- Do not add a dependency. The stdlib-only constraint is part of the design.
-- Tests live in `tests/` and use `unittest`, not pytest.
+- `mini_agent/` è codice didattico: preferisci la chiarezza all'astuzia e tieni i
+  moduli abbastanza piccoli da leggerli in una sola seduta.
+- Ogni laboratorio (`labs/L*.py`) deve funzionare da solo e uscire con 0.
+- Ogni modulo in `lessons/` corrisponde a un laboratorio e a un modulo di `mini_agent`.
+- Non aggiungere dipendenze. Il vincolo di sola stdlib fa parte del design.
+- I test stanno in `tests/` e usano `unittest`, non pytest.
 
-## Traps
+## Trappole
 
-- `make` is not installed in every environment. Use `python3 run.py ...` in
-  docs and CI.
-- Labs write to the OS temp directory, never into the repo.
-- `.gitignore` excludes `sandbox/` and `.mini_agent/`; do not commit them.
+- `make` non è installato in ogni ambiente. Usa `python3 run.py ...` in
+  documentazione e CI.
+- I laboratori scrivono nella directory temporanea del sistema operativo, mai nella repo.
+- `.gitignore` esclude `sandbox/` e `.mini_agent/`; non committarli.
 
-## Style
+## Stile
 
-- British spelling in prose ("summarise", "behaviour"), consistent with the
-  lessons.
-- ASCII diagrams, no Unicode box drawing.
-- Code comments explain *why*, not *what*.
+- Ortografia britannica in prosa ("summarise", "behaviour"), coerente con le
+  lezioni.
+- Diagrammi ASCII, niente box drawing Unicode.
+- I commenti del codice spiegano il *perché*, non il *cosa*.

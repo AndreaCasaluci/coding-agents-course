@@ -89,7 +89,7 @@ def run_evals(
             try:
                 verdict = case.check(result, ws)
             except Exception as exc:  # a broken grader is a failed eval, not a crash
-                verdict = f"grader error: {type(exc).__name__}: {exc}"
+                verdict = f"errore del valutatore: {type(exc).__name__}: {exc}"
 
             passed = verdict is True
             detail = "ok" if verdict is True else (verdict if isinstance(verdict, str) else "failed")
@@ -106,7 +106,7 @@ def run_evals(
             )
         finally:
             if keep_artifacts:
-                print(f"[eval] artifacts kept at {tmp}")
+                print(f"[eval] artefatti conservati in {tmp}")
             else:
                 shutil.rmtree(tmp, ignore_errors=True)
     return results
@@ -115,8 +115,8 @@ def run_evals(
 def report(results: list[EvalResult]) -> str:
     total = len(results)
     passed = sum(1 for r in results if r.passed)
-    lines = [f"# Eval report — {passed}/{total} passed", ""]
-    lines.append("| case | result | detail | turns | tokens | s |")
+    lines = [f"# Report eval — {passed}/{total} superate", ""]
+    lines.append("| caso | esito | dettaglio | turni | token | s |")
     lines.append("|---|---|---|---|---|---|")
     for r in results:
         mark = "PASS" if r.passed else "FAIL"

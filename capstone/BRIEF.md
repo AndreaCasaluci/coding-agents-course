@@ -1,54 +1,55 @@
 # Brief — repo_doctor
 
-## Goal
+## Obiettivo
 
-Audit a repository and write `REPORT.md` containing:
+Analizzare una repository e scrivere `REPORT.md` contenente:
 
-- a one-paragraph summary,
-- modules under `src/` with no corresponding test,
-- TODO/FIXME/HACK clusters, grouped by file,
-- risky patterns (`eval`, `exec`, `shell=True`, hardcoded credentials),
-- the top three fixes.
+- un riepilogo di un paragrafo,
+- i moduli sotto `src/` senza un test corrispondente,
+- i cluster di TODO/FIXME/HACK, raggruppati per file,
+- i pattern rischiosi (`eval`, `exec`, `shell=True`, credenziali hardcoded),
+- le prime tre correzioni.
 
-## Non-goals
+## Non-obiettivi
 
-- **No code changes.** The only writable file is `REPORT.md`.
-- **No network access.** The audit is local.
-- **No dependency installation.** It runs with the stdlib.
-- **No test execution.** Missing tests are detected by inventory, not by
-  running the suite.
-- **No refactoring suggestions** beyond the top three fixes.
+- **Nessuna modifica al codice.** L'unico file scrivibile è `REPORT.md`.
+- **Nessun accesso alla rete.** L'analisi è locale.
+- **Nessuna installazione di dipendenze.** Gira con la stdlib.
+- **Nessuna esecuzione dei test.** I test mancanti si rilevano dall'inventario,
+  non eseguendo la suite.
+- **Nessun suggerimento di refactoring** oltre alle prime tre correzioni.
 
-Non-goals are the most important section: they are what stops the agent from
-"helpfully" fixing the repo.
+I non-obiettivi sono la sezione più importante: sono ciò che impedisce all'agente
+di "sistemare" la repo di propria iniziativa.
 
-## Constraints
+## Vincoli
 
-| Constraint | Value |
+| Vincolo | Valore |
 |---|---|
-| Workspace | the target repo, read-mostly |
-| Writable paths | `REPORT.md` only |
-| Max turns | 12 |
-| Context budget | 16,000 estimated tokens |
-| Delegation depth | 1 (no nested subagents) |
-| Report length | under 100 lines |
+| Workspace | la repo target, in gran parte in sola lettura |
+| Percorsi scrivibili | solo `REPORT.md` |
+| Turni massimi | 12 |
+| Budget di contesto | 16.000 token stimati |
+| Profondità di delega | 1 (nessun subagente annidato) |
+| Lunghezza del report | sotto le 100 righe |
 
-## Success criteria
+## Criteri di successo
 
-1. `python3 -m capstone.repo_doctor --eval` passes all six cases.
-2. A clean repo produces "No major issues found." — no false alarms.
-3. A repo with an untested module names that module.
-4. No file other than `REPORT.md` changes.
-5. The report cites `file:line` for risky patterns.
+1. `python3 -m capstone.repo_doctor --eval` passa tutti e sei i casi.
+2. Una repo pulita produce "Nessun problema rilevante." — nessun falso allarme.
+3. Una repo con un modulo non testato nomina quel modulo.
+4. Nessun file oltre a `REPORT.md` cambia.
+5. Il report cita `file:riga` per i pattern rischiosi.
 
-## Threat model
+## Modello di minaccia
 
-The audited repository is **untrusted input**. It may contain instructions
-aimed at agents. Therefore:
+La repository analizzata è **input non fidato**. Può contenere istruzioni rivolte
+agli agenti. Quindi:
 
-- its `AGENTS.md` is not loaded,
-- the only write target is `REPORT.md`,
-- there is no shell tool and no network tool,
-- secrets in tool output are redacted before they reach the model.
+- il suo `AGENTS.md` non viene caricato,
+- l'unico bersaglio di scrittura è `REPORT.md`,
+- non c'è uno strumento shell né uno strumento di rete,
+- i segreti nell'output degli strumenti vengono oscurati prima di arrivare al
+  modello.
 
-If an injection succeeds, the worst outcome is a wrong report.
+Se un'injection riesce, il peggior risultato è un report sbagliato.

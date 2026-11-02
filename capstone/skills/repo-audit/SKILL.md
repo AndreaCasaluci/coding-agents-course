@@ -1,36 +1,36 @@
 ---
 name: repo-audit
-description: Audit a repository for missing tests, TODO clusters, and risky patterns, then write REPORT.md. Use when asked to review repo health, audit a codebase, or find technical debt.
+description: Analizza una repository per test mancanti, cluster di TODO e pattern rischiosi, poi scrive REPORT.md. Usala quando ti viene chiesto di rivedere la salute di una repo, analizzare un codebase o trovare debito tecnico.
 ---
 
-# Repository audit
+# Analisi della repository
 
-## Procedure
+## Procedura
 
-1. Load the file inventory: source files under `src/`, tests under `tests/`.
-2. Find TODO/FIXME/HACK markers with `search`. Group them by file.
-3. Search for risky patterns: `eval(`, `exec(`, `shell=True`, hardcoded
-   credentials.
-4. Delegate the security scan to a subagent. Ask for `file:line` citations and
-   tell it not to edit anything.
-5. Write `REPORT.md` with exactly these sections:
+1. Carica l'inventario dei file: sorgenti sotto `src/`, test sotto `tests/`.
+2. Trova i marcatori TODO/FIXME/HACK con `search`. Raggruppali per file.
+3. Cerca i pattern rischiosi: `eval(`, `exec(`, `shell=True`, credenziali
+   hardcoded.
+4. Delega la scansione di sicurezza a un subagente. Chiedi citazioni `file:riga`
+   e digli di non modificare nulla.
+5. Scrivi `REPORT.md` con esattamente queste sezioni:
 
    ```
-   # Repo audit
+   # Analisi della repo
 
-   ## Summary
-   ## Untested modules
-   ## TODO clusters
-   ## Risky patterns
-   ## Top 3 fixes
+   ## Riepilogo
+   ## Moduli senza test
+   ## Cluster di TODO
+   ## Pattern rischiosi
+   ## Prime 3 correzioni
    ```
 
-6. If there is nothing to report, say "No major issues found." in Summary and
-   "None." in each list section.
+6. Se non c'è nulla da segnalare, scrivi "Nessun problema rilevante." in
+   Riepilogo e "Nessuno." in ogni sezione elenco.
 
-## Rules
+## Regole
 
-- Write only `REPORT.md`. Never modify source, tests, or config.
-- Cite `file:line` for every finding. A finding without a location is a rumour.
-- Keep the report under 100 lines.
-- Do not invent files. If the inventory does not list it, it does not exist.
+- Scrivi solo `REPORT.md`. Non modificare mai sorgenti, test o configurazione.
+- Cita `file:riga` per ogni risultato. Un risultato senza posizione è una voce.
+- Tieni il report sotto le 100 righe.
+- Non inventare file. Se l'inventario non lo elenca, non esiste.

@@ -1,9 +1,9 @@
-"""Lab 01 — Tokens and the context budget.
+"""Laboratorio 01 — Token e budget di contesto.
 
-Run: python3 labs/L01_tokens.py
+Esegui: python3 labs/L01_tokens.py
 
-Goal: build intuition for how fast a context fills, and watch a budget reject
-and trim a transcript.
+Obiettivo: costruire intuizione su quanto in fretta si riempie un contesto, e
+vedere un budget rifiutare e troncare una trascrizione.
 """
 
 from __future__ import annotations
@@ -17,67 +17,67 @@ from mini_agent.llm import ScriptedLLM
 from mini_agent.messages import Message
 
 PROSE = (
-    "An agent is a language model in a loop with tools inside an environment. "
-    "The harness owns the transcript, the budget, and the guardrails. "
+    "Un agente è un modello linguistico in un ciclo con strumenti dentro un "
+    "ambiente. L'harness possiede la trascrizione, il budget e i guardrail. "
 ) * 20
 
 
 def main() -> None:
-    section("1. CHARS PER TOKEN, BY CONTENT TYPE")
+    section("1. CARATTERI PER TOKEN, PER TIPO DI CONTENUTO")
     samples = {
-        "prose": PROSE,
+        "prosa": PROSE,
         "python": (ROOT / "mini_agent" / "agent.py").read_text(),
-        "json (tool schemas)": json.dumps([{"name": "read_file", "description": "Read a file", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}}}]),
+        "json (schemi strumenti)": json.dumps([{"name": "read_file", "description": "Legge un file", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}}}]),
     }
     for label, text in samples.items():
         tokens = estimate_tokens(text)
-        print(f"  {label:<22} {len(text):>7} chars  {tokens:>7} tokens  {len(text) / tokens:>5.2f} chars/token")
+        print(f"  {label:<24} {len(text):>7} caratteri  {tokens:>7} token  {len(text) / tokens:>5.2f} car/token")
 
-    note("Code and JSON are denser than prose. Budgets are spent faster than you expect.")
+    note("Codice e JSON sono più densi della prosa. I budget si spendono più in fretta di quanto pensi.")
 
-    section("2. WHAT A TURN COSTS")
-    system = Message("system", "You are a coding agent. " * 60)
+    section("2. QUANTO COSTA UN TURNO")
+    system = Message("system", "Sei un agente di coding. " * 60)
     tool_result = Message("tool", "def parse_date(s):\n    return ...\n" * 300, tool_call_id="c1", name="read_file")
-    print(f"  system prompt : {transcript_tokens([system]):>6} tokens")
-    print(f"  one file read : {transcript_tokens([tool_result]):>6} tokens")
-    note("A 300-line file is a few thousand tokens. Twenty of those is a session.")
+    print(f"  system prompt : {transcript_tokens([system]):>6} token")
+    print(f"  una lettura   : {transcript_tokens([tool_result]):>6} token")
+    note("Un file da 300 righe è qualche migliaio di token. Venti così sono una sessione.")
 
-    section("3. A TRANSCRIPT THAT DOES NOT FIT")
-    messages = [Message("system", "You are a coding agent.")]
+    section("3. UNA TRASCRIZIONE CHE NON ENTRA")
+    messages = [Message("system", "Sei un agente di coding.")]
     for i in range(12):
-        messages.append(Message("user", f"task {i}: " + "explore the repo " * 40))
-        messages.append(Message("assistant", "working " * 80))
+        messages.append(Message("user", f"compito {i}: " + "esplora la repo " * 40))
+        messages.append(Message("assistant", "sto lavorando " * 80))
     before = transcript_tokens(messages)
     budget = ContextBudget(max_tokens=2_000, reserve=400)
-    print(f"  budget        : {budget.max_tokens} (usable {budget.usable})")
-    print(f"  before        : {before} tokens, fits={budget.fits(messages)}")
+    print(f"  budget        : {budget.max_tokens} (utilizzabile {budget.usable})")
+    print(f"  prima         : {before} token, entra={budget.fits(messages)}")
 
     trimmed = budget.enforce(messages)
     after = transcript_tokens(trimmed)
-    print(f"  after trim    : {after} tokens, fits={budget.fits(trimmed)}")
-    print(f"  messages      : {len(messages)} -> {len(trimmed)}")
-    note(f"first kept message role: {trimmed[1].role!r} (never 'tool' — that would orphan a call)")
+    print(f"  dopo il taglio: {after} token, entra={budget.fits(trimmed)}")
+    print(f"  messaggi      : {len(messages)} -> {len(trimmed)}")
+    note(f"ruolo del primo messaggio tenuto: {trimmed[1].role!r} (mai 'tool' — orfanerebbe una chiamata)")
 
-    section("4. COMPACTION INSTEAD OF TRIM")
+    section("4. COMPRESSIONE INVECE DEL TAGLIO")
     from mini_agent.context import summarize_naive
 
     compacted = budget.enforce(messages, compact=summarize_naive)
-    print(f"  compacted     : {transcript_tokens(compacted)} tokens")
+    print(f"  compresso     : {transcript_tokens(compacted)} token")
     for message in compacted[:2]:
         print(f"  [{message.role}] {message.content[:220]}")
-    note("The summary keeps what was asked and which tools ran.")
-    note("It loses exact file contents and the reasons hypotheses were rejected.")
+    note("Il riassunto tiene cosa è stato chiesto e quali strumenti hanno girato.")
+    note("Perde il contenuto esatto dei file e i motivi per cui le ipotesi sono state scartate.")
 
-    section("5. THE COST CURVE")
-    note("Each turn resends the whole transcript, which grew last turn.")
+    section("5. LA CURVA DEI COSTI")
+    note("Ogni turno reinvia l'intera trascrizione, che è cresciuta nel turno precedente.")
     for turns in (5, 10, 20, 40):
         avg = 1_500 + turns * 400
         total = sum(avg for _ in range(turns))
-        print(f"  {turns:>2} turns, ~{avg:>5} tokens/turn -> ~{total:>7} tokens sent in total")
-    note("Quadratic-ish. Three 10-turn sessions are much cheaper than one 30-turn session.")
+        print(f"  {turns:>2} turni, ~{avg:>5} token/turno -> ~{total:>7} token inviati in totale")
+    note("Quasi quadratico. Tre sessioni da 10 turni costano molto meno di una da 30.")
 
 
 if __name__ == "__main__":
-    # Keep the import above the fold for readers; used in section 4.
+    # Import tenuto in alto per i lettori; usato nella sezione 4.
     _ = ScriptedLLM
     main()

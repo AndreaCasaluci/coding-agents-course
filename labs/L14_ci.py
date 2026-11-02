@@ -1,9 +1,10 @@
-"""Lab 14 — Headless CI: budgets, read-only review, and a report.
+"""Laboratorio 14 — CI headless: budget, revisione in sola lettura e report.
 
-Run: python3 labs/L14_ci.py
+Esegui: python3 labs/L14_ci.py
 
-Goal: run the harness the way CI would — no human, hard limits, machine-readable
-output — then see the permission layer refuse a push.
+Obiettivo: eseguire l'harness come farebbe la CI — nessun umano, limiti rigidi,
+output leggibile dalla macchina — poi vedere il livello dei permessi rifiutare
+un push.
 """
 
 from __future__ import annotations
@@ -29,14 +30,14 @@ class JobResult:
 
 
 def review_policy(messages, tools):
-    """A deterministic stand-in for a review model."""
+    """Un sostituto deterministico di un modello revisore."""
     last = messages[-1]
     if last.role == "tool":
         findings = []
         if "eval(" in last.content:
-            findings.append({"severity": "high", "file": "src/unsafe.py", "line": 2, "issue": "eval on input"})
-        return Message("assistant", json.dumps({"findings": findings, "summary": "review complete"}))
-    return Message("assistant", "Reading the risky file.", [
+            findings.append({"severity": "high", "file": "src/unsafe.py", "line": 2, "issue": "eval su input"})
+        return Message("assistant", json.dumps({"findings": findings, "summary": "revisione completata"}))
+    return Message("assistant", "Leggo il file rischioso.", [
         ToolCall("c1", "read_file", {"path": "src/unsafe.py"})
     ])
 
@@ -49,7 +50,7 @@ def run_ci_job(ws: Workspace, max_turns: int = 6, budget_tokens: int = 8_000) ->
         budget=ContextBudget(max_tokens=budget_tokens),
         max_turns=max_turns,
     )
-    result = agent.run("review src/unsafe.py and return JSON findings")
+    result = agent.run("rivedi src/unsafe.py e restituisci i risultati in JSON")
     try:
         report = json.loads(result.final)
     except json.JSONDecodeError:
@@ -63,45 +64,45 @@ def main() -> None:
         ws.write("src/unsafe.py", "def run(x):\n    return eval(x)\n")
         ws.write("src/app.py", "def main():\n    return 0\n")
 
-        section("1. READ-ONLY REVIEW JOB")
+        section("1. JOB DI REVISIONE IN SOLA LETTURA")
         job = run_ci_job(ws)
         print(json.dumps(
             {"ok": job.ok, "turns": job.turns, "tokens": job.tokens, "stopped": job.stopped},
             indent=2,
         ))
         print(json.dumps(job.report, indent=2))
-        note("Machine-readable output is the deliverable. Prose is for humans.")
+        note("L'output leggibile dalla macchina è il deliverable. La prosa è per gli umani.")
 
-        section("2. HARD LIMITS")
+        section("2. LIMITI RIGIDI")
         tiny = run_ci_job(ws, max_turns=1)
-        print(f"  max_turns=1 -> stopped={tiny.stopped} turns={tiny.turns}")
-        note("A capped job fails cleanly instead of burning the CI budget.")
-        note("Budget and turn limits are configuration, not suggestions.")
+        print(f"  max_turns=1 -> stop={tiny.stopped} turni={tiny.turns}")
+        note("Un job limitato fallisce in modo pulito invece di bruciare il budget della CI.")
+        note("Limiti di budget e turni sono configurazione, non suggerimenti.")
 
-        section("3. THE REVIEWER MUST NOT WRITE")
+        section("3. IL REVISORE NON DEVE SCRIVERE")
         read_only_ws = Workspace(tmp, read_only=True)
         @tool(side_effect=True, needs_permission=True)
         def write_file_attempt(path: str, content: str) -> str:
-            """A write that should never be reachable in review mode."""
+            """Una scrittura che non dovrebbe mai essere raggiungibile in revisione."""
             return read_only_ws.write(path, content)
 
         agent = Agent(
-            PolicyLLM(lambda m, t: Message("assistant", "trying", [
+            PolicyLLM(lambda m, t: Message("assistant", "provo", [
                 ToolCall("c1", "write_file_attempt", {"path": "fixed.py", "content": "x"})
-            ]) if m[-1].role != "tool" else Message("assistant", "denied, stopping")),
+            ]) if m[-1].role != "tool" else Message("assistant", "negato, mi fermo")),
             [write_file_attempt],
             workspace=read_only_ws,
             max_turns=3,
         )
-        result = agent.run("fix the finding")
-        print(f"  transcript: {[m.text()[:60] for m in result.messages[1:]]}")
-        note("Read-only mode is enforced by the workspace, not by the prompt.")
+        result = agent.run("correggi il risultato")
+        print(f"  trascrizione: {[m.text()[:60] for m in result.messages[1:]]}")
+        note("La modalità sola lettura è imposta dal workspace, non dal prompt.")
 
-        section("4. WRITE MODE: THE PUSH IS DENIED")
+        section("4. MODALITÀ SCRITTURA: IL PUSH VIENE NEGATO")
         hooks = HookBus()
         hooks.on(
             PRE_TOOL,
-            lambda p: HookResult(False, "git push requires human approval")
+            lambda p: HookResult(False, "git push richiede approvazione umana")
             if p["tool"] == "run_shell" and "push" in str(p["arguments"])
             else None,
             name="no-push",
@@ -109,33 +110,33 @@ def main() -> None:
 
         @tool(side_effect=True, needs_permission=True)
         def run_shell(command: str) -> str:
-            """Run a shell command."""
-            return f"ran: {command}"
+            """Esegue un comando shell."""
+            return f"eseguito: {command}"
 
         agent = Agent(
-            PolicyLLM(lambda m, t: Message("assistant", "pushing", [
+            PolicyLLM(lambda m, t: Message("assistant", "faccio il push", [
                 ToolCall("c1", "run_shell", {"command": "git push origin main"})
-            ]) if m[-1].role != "tool" else Message("assistant", "push denied; stopping")),
+            ]) if m[-1].role != "tool" else Message("assistant", "push negato, mi fermo")),
             [run_shell],
             workspace=ws,
             hooks=hooks,
             max_turns=3,
         )
-        result = agent.run("push the fix")
-        print(f"  transcript: {[m.text()[:70] for m in result.messages[1:]]}")
-        note("Writes go to a branch; pushes need a human. Encode it in a hook.")
+        result = agent.run("fai il push della correzione")
+        print(f"  trascrizione: {[m.text()[:70] for m in result.messages[1:]]}")
+        note("Le scritture vanno su un branch; i push richiedono un umano. Codificalo in un hook.")
 
-        section("5. WHAT TO AUTOMATE FIRST")
-        note("1. diff review comments (read-only)")
-        note("2. issue triage / labels")
-        note("3. lint and type fixes (narrow, verifiable)")
-        note("4. dependency updates (test-gated)")
-        note("5. feature work (last, with a human in the loop)")
+        section("5. COSA AUTOMATIZZARE PRIMA")
+        note("1. commenti di revisione sui diff (sola lettura)")
+        note("2. triage delle issue / etichette")
+        note("3. correzioni di lint e tipi (stretto, verificabile)")
+        note("4. aggiornamento delle dipendenze (protetto dai test)")
+        note("5. sviluppo di funzionalità (per ultimo, con un umano nel ciclo)")
 
-        section("6. METRICS THAT SURVIVE SCRUTINY")
-        note("acceptance rate, revert rate, human edit rate")
-        note("cycle time, cost per merged PR, escaped defects")
-        note("not: lines generated, sessions started, self-reported time saved")
+        section("6. METRICHE CHE REGGONO IL CONFRONTO")
+        note("tasso di accettazione, tasso di revert, tasso di modifiche umane")
+        note("tempo di ciclo, costo per PR integrata, difetti sfuggiti")
+        note("non: righe generate, sessioni avviate, tempo risparmiato autodichiarato")
 
 
 if __name__ == "__main__":

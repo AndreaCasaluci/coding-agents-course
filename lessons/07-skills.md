@@ -1,181 +1,183 @@
-# 07 — Skills
+# 07 — Skill
 
-> **Objectives**
-> - Explain progressive disclosure and why it is the core idea.
-> - Write a `SKILL.md` whose description actually triggers.
-> - Choose between a skill, a tool, and an instruction.
+> **Obiettivi**
+> - Spiegare la divulgazione progressiva e perché è l'idea centrale.
+> - Scrivere un `SKILL.md` la cui descrizione fa davvero scattare il caricamento.
+> - Scegliere tra skill, strumento e istruzione.
 
-## The capability explosion
+## L'esplosione delle capacità
 
-An agent that can do 50 things cannot hold 50 procedures in context. Forty
-skills at ~800 tokens each is 32k tokens of instructions — the entire budget
-spent on capability the task does not need. Quality drops, cost rises.
+Un agente che sa fare 50 cose non può tenere 50 procedure nel contesto.
+Quaranta skill da ~800 token ciascuna sono 32k token di istruzioni — l'intero
+budget speso su capacità che il compito non richiede. La qualità cala, il costo
+sale.
 
-The fix is not better summarisation. It is **not loading what you do not need**.
+La soluzione non è un riassunto migliore. È **non caricare ciò che non serve**.
 
-## Progressive disclosure
+## Divulgazione progressiva
 
 ```
-L1  catalog: name + one-line description        ~50 tokens/skill, always loaded
+L1  catalogo: nome + descrizione in una riga    ~50 token/skill, sempre caricato
      │
-     ├─ task matches description?
+     ├─ il compito corrisponde alla descrizione?
      ▼
-L2  SKILL.md body: the procedure               ~500–2,000 tokens, loaded on demand
+L2  corpo dello SKILL.md: la procedura          ~500–2.000 token, caricato su richiesta
      │
-     ├─ procedure needs a template or script?
+     ├─ la procedura richiede un template o uno script?
      ▼
-L3  resources: files, scripts, examples        unbounded, read/executed on demand
+L3  risorse: file, script, esempi               illimitato, letto/eseguito su richiesta
 ```
 
-Ten skills cost ~500 tokens at L1. Only the one you use costs its full body.
-That is a 60× reduction in fixed cost, and — more importantly — it keeps the
-context focused.
+Dieci skill costano ~500 token a L1. Solo quella che usi costa il suo corpo
+intero. È una riduzione di 60× del costo fisso e — cosa più importante — mantiene
+il contesto concentrato.
 
-This is exactly how you already work: you know which runbooks exist, you open
-one when the incident matches.
+È esattamente come lavori già: sai quali runbook esistono, ne apri uno quando
+l'incidente corrisponde.
 
-## Anatomy of a skill
+## Anatomia di una skill
 
 ```
 skills/
   release-notes/
-    SKILL.md          ← required
-    template.md       ← optional resource
-    collect.py        ← optional script
+    SKILL.md          ← obbligatorio
+    template.md       ← risorsa opzionale
+    collect.py        ← script opzionale
 ```
 
 ```markdown
 ---
 name: release-notes
-description: Write release notes from git history. Use when asked to prepare
-  a release, changelog, or "what changed since vX".
+description: Scrive le note di rilascio dalla cronologia git. Usala quando ti
+  viene chiesto di preparare una release, un changelog o "cosa è cambiato da vX".
 ---
 
-# Release notes
+# Note di rilascio
 
-1. Determine the range: `git log --oneline <last-tag>..HEAD`.
-2. Group commits: features, fixes, breaking changes, chores.
-3. Drop merge commits and version bumps.
-4. Follow `template.md` exactly. Keep each bullet under 100 chars.
-5. If a breaking change exists, put it first and mark it **BREAKING**.
+1. Determina l'intervallo: `git log --oneline <ultimo-tag>..HEAD`.
+2. Raggruppa i commit: funzionalità, correzioni, breaking change, manutenzione.
+3. Scarta i merge commit e i bump di versione.
+4. Segui `template.md` alla lettera. Ogni voce sotto i 100 caratteri.
+5. Se c'è un breaking change, mettilo per primo e marcalo **BREAKING**.
 ```
 
-Two fields in the frontmatter matter:
+Due campi nel frontmatter contano:
 
-- **`name`** — stable identifier, matches the folder.
-- **`description`** — **the trigger**. This is prompt text, and it is the only
-  thing the model sees before deciding to load the skill.
+- **`name`** — identificatore stabile, uguale alla cartella.
+- **`description`** — **l'innesco**. È testo di prompt, ed è l'unica cosa che il
+  modello vede prima di decidere se caricare la skill.
 
-## The description is the whole game
+## La descrizione è tutto
 
-A skill that never loads is dead weight; a skill that loads for everything is
-context poison.
+Una skill che non si carica mai è peso morto; una skill che si carica per tutto è
+veleno per il contesto.
 
-| Bad description | Why |
+| Descrizione scadente | Perché |
 |---|---|
-| "Helps with releases" | Vague; competes with everything |
-| "A skill for doing release notes" | Restates the name, adds no trigger |
-| "Release notes, changelogs, version bumps, tags, GitHub releases, semver, git log, commit messages, …" | Keyword soup; loads too often |
+| "Aiuta con le release" | Vaga; compete con tutto |
+| "Una skill per fare le note di rilascio" | Ripete il nome, non aggiunge innesco |
+| "Note di rilascio, changelog, bump di versione, tag, release GitHub, semver, git log, messaggi di commit, …" | Minestra di parole chiave; si carica troppo spesso |
 
-| Good description | Why |
+| Descrizione buona | Perché |
 |---|---|
-| "Write release notes from git history. Use when asked to prepare a release, changelog, or 'what changed since vX'." | Says *what* and *when*, in the user's words |
+| "Scrive le note di rilascio dalla cronologia git. Usala quando ti viene chiesto di preparare una release, un changelog o 'cosa è cambiato da vX'." | Dice *cosa* e *quando*, con le parole dell'utente |
 
-Formula: **what it produces + when to use it + the phrases a user would say.**
+Formula: **cosa produce + quando usarla + le frasi che direbbe un utente.**
 
-## Skills vs tools vs instructions
+## Skill, strumenti, istruzioni
 
-| | Instruction (`AGENTS.md`) | Skill | Tool |
+| | Istruzione (`AGENTS.md`) | Skill | Strumento |
 |---|---|---|---|
-| Loaded | always | on demand | schema always, result on call |
-| Contains | rules, commands, traps | a procedure | an action |
-| Changes | how the model behaves | what the model knows how to do | what the model can do |
-| Cost | small, fixed | medium, when used | schema always + result |
-| Example | "run `make test`" | "how to write a migration" | `read_file` |
+| Caricamento | sempre | su richiesta | schema sempre, risultato alla chiamata |
+| Contiene | regole, comandi, trappole | una procedura | un'azione |
+| Cambia | come si comporta il modello | cosa sa fare il modello | cosa può fare il modello |
+| Costo | piccolo, fisso | medio, quando usata | schema sempre + risultato |
+| Esempio | "esegui `make test`" | "come scrivere una migrazione" | `read_file` |
 
-A useful test: if it can be *done*, it is a tool. If it is a *procedure*, it is
-a skill. If it is a *constraint*, it is an instruction.
+Un test utile: se si può *fare*, è uno strumento. Se è una *procedura*, è una
+skill. Se è un *vincolo*, è un'istruzione.
 
-## Scripts and resources
+## Script e risorse
 
-Skills can ship code. Two patterns:
+Le skill possono includere codice. Due pattern:
 
-**Resource** — a template the model reads and fills:
+**Risorsa** — un template che il modello legge e compila:
 
 ```markdown
-Follow `template.md`. Do not invent sections.
+Segui `template.md`. Non inventare sezioni.
 ```
 
-**Script** — a deterministic step the model should not re-derive:
+**Script** — un passo deterministico che il modello non deve ri-derivare:
 
 ```
 skills/
   db-migration/
     SKILL.md
-    new_migration.py     ← generates a correctly-named, timestamped file
+    new_migration.py     ← genera un file correttamente nominato e datato
 ```
 
 ```markdown
-Run `python3 skills/db-migration/new_migration.py <name>`.
-Do not create the file by hand — the timestamp format matters.
+Esegui `python3 skills/db-migration/new_migration.py <nome>`.
+Non creare il file a mano — il formato del timestamp conta.
 ```
 
-This is the same principle as hooks: **deterministic work belongs in code, not
-in a prompt.** A skill can carry the code and the instructions for using it.
+È lo stesso principio degli hook: **il lavoro deterministico appartiene al codice,
+non a un prompt.** Una skill può portare il codice e le istruzioni per usarlo.
 
-⚠️ A skill script is executed code. Treat a third-party skill folder like a
-third-party dependency.
+⚠️ Lo script di una skill è codice eseguito. Tratta la cartella di una skill di
+terze parti come una dipendenza di terze parti.
 
-## Failure modes
+## Modalità di fallimento
 
-| Failure | Cause | Fix |
+| Fallimento | Causa | Soluzione |
 |---|---|---|
-| Skill never loads | Vague description | Rewrite trigger in user language |
-| Skill loads for everything | Description too broad | Add "Use when…" and negative scope |
-| Skill loads but is ignored | Body is prose, not steps | Numbered steps, concrete commands |
-| Skill contradicts `AGENTS.md` | Two sources of truth | Delete one; keep rules in instructions |
-| Skill is 3,000 tokens of context | No progressive disclosure inside | Move detail to resources (L3) |
-| Model re-derives instead of running the script | Not told to run it | "Run X. Do not do Y by hand." |
+| La skill non si carica mai | Descrizione vaga | Riscrivi l'innesco nella lingua dell'utente |
+| Si carica per tutto | Descrizione troppo ampia | Aggiungi "Usala quando…" e delimita |
+| Si carica ma viene ignorata | Il corpo è prosa, non passi | Passi numerati, comandi concreti |
+| Contraddice `AGENTS.md` | Due fonti di verità | Eliminane una; le regole stanno nelle istruzioni |
+| Sono 3.000 token di contesto | Nessuna divulgazione progressiva interna | Sposta i dettagli nelle risorse (L3) |
+| Il modello ri-deriva invece di eseguire lo script | Non glielo hai detto | "Esegui X. Non fare Y a mano." |
 
-## Authoring checklist
+## Checklist di scrittura
 
-- [ ] Name matches folder, lowercase, hyphens.
-- [ ] Description states output + trigger phrases, under ~200 chars.
-- [ ] Body is numbered steps, not an essay.
-- [ ] Every command is copy-pasteable and correct.
-- [ ] Detail lives in resources, not the body.
-- [ ] No rule duplicated from `AGENTS.md`.
-- [ ] Tested: does it load for the intended task and *not* for a neighbouring
-      task?
+- [ ] Il nome corrisponde alla cartella, minuscolo, con trattini.
+- [ ] La descrizione dice output + frasi di innesco, sotto i ~200 caratteri.
+- [ ] Il corpo è a passi numerati, non un saggio.
+- [ ] Ogni comando è copiabile e corretto.
+- [ ] I dettagli stanno nelle risorse, non nel corpo.
+- [ ] Nessuna regola duplicata da `AGENTS.md`.
+- [ ] Testata: si carica per il compito previsto e *non* per uno vicino?
 
-## Lab
+## Laboratorio
 
 ```bash
 python3 labs/L07_skills.py
 ```
 
-You will create two skills, inspect the L1 catalog cost, load one to L2, read a
-resource at L3, and see a vague description fail to match while a specific one
-succeeds.
+Creerai due skill, ispezionerai il costo del catalogo a L1, ne caricherai una a
+L2, leggerai una risorsa a L3 e vedrai una descrizione vaga non corrispondere,
+mentre una specifica sì.
 
-🔬 **Break it:** give two skills nearly identical descriptions and watch the
-matcher pick arbitrarily.
+🔬 **Fallo fallire:** dai a due skill descrizioni quasi identiche e guarda il
+matcher scegliere arbitrariamente.
 
-## ✅ Checkpoint
+## ✅ Verifica
 
-1. What problem does progressive disclosure solve, in token terms?
-2. What are the three disclosure levels?
-3. What makes a description good or bad?
-4. Skill, tool, or instruction: "never touch `legacy/`"?
-5. Why ship a script with a skill instead of describing the steps?
+1. Quale problema risolve la divulgazione progressiva, in termini di token?
+2. Quali sono i tre livelli di divulgazione?
+3. Cosa rende buona o cattiva una descrizione?
+4. Skill, strumento o istruzione: "non toccare mai `legacy/`"?
+5. Perché spedire uno script con una skill invece di descrivere i passi?
 
 <details>
-<summary>Answers</summary>
+<summary>Risposte</summary>
 
-1. Fixed context cost: N skills cost ~50 tokens each instead of ~800.
-2. Catalog line, full body, resources/scripts.
-3. Good: output + when + user phrases. Bad: vague or keyword soup.
-4. Instruction.
-5. Deterministic work (naming, timestamps, formatting) should not be
-   re-derived by a probabilistic model.
+1. Il costo fisso del contesto: N skill costano ~50 token ciascuna invece di
+   ~800.
+2. Riga di catalogo, corpo completo, risorse/script.
+3. Buona: output + quando + frasi dell'utente. Cattiva: vaga o minestra di
+   parole chiave.
+4. Istruzione.
+5. Il lavoro deterministico (nomi, timestamp, formattazione) non va ri-derivato
+   da un modello probabilistico.
 </details>

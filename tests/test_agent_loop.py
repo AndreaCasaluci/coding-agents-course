@@ -46,7 +46,7 @@ class LoopTests(unittest.TestCase):
         result = self.make(llm).run("read missing")
         tool_msg = result.messages[-2]
         self.assertEqual(tool_msg.role, "tool")
-        self.assertIn("No such file", tool_msg.content)
+        self.assertIn("File inesistente", tool_msg.content)
         self.assertEqual(result.final, "recovered")
 
     def test_max_turns_is_enforced(self):

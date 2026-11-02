@@ -1,4 +1,4 @@
-"""Command line entry point: ``python3 -m mini_agent "task"``."""
+"""Punto d'ingresso della riga di comando: ``python3 -m mini_agent "compito"``."""
 
 from __future__ import annotations
 
@@ -15,19 +15,19 @@ from .context import transcript_tokens
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="mini_agent",
-        description="A small coding agent. Offline by default (scripted model).",
+        description="Un piccolo agente di coding. Offline per default (modello preimpostato).",
     )
-    parser.add_argument("task", nargs="?", help="What you want the agent to do")
-    parser.add_argument("--root", default=".", help="Workspace root (default: .)")
+    parser.add_argument("task", nargs="?", help="Cosa vuoi che l'agente faccia")
+    parser.add_argument("--root", default=".", help="Radice del workspace (default: .)")
     parser.add_argument("--max-turns", type=int, default=20)
-    parser.add_argument("--budget", type=int, default=32_000, help="Context budget in estimated tokens")
-    parser.add_argument("--read-only", action="store_true", help="Refuse all writes")
+    parser.add_argument("--budget", type=int, default=32_000, help="Budget di contesto in token stimati")
+    parser.add_argument("--read-only", action="store_true", help="Rifiuta tutte le scritture")
     parser.add_argument("--no-skills", action="store_true")
-    parser.add_argument("--audit", default=".mini_agent/audit.log", help="Audit log path ('' to disable)")
+    parser.add_argument("--audit", default=".mini_agent/audit.log", help="Percorso del log di audit ('' per disabilitare)")
     parser.add_argument("--provider", choices=["mock", "openai"], default=os.environ.get("MINI_AGENT_PROVIDER", "mock"))
     parser.add_argument("--verbose", action="store_true")
-    parser.add_argument("--json", action="store_true", help="Print the full run result as JSON")
-    parser.add_argument("--transcript", action="store_true", help="Print the full message transcript")
+    parser.add_argument("--json", action="store_true", help="Stampa l'intero risultato come JSON")
+    parser.add_argument("--transcript", action="store_true", help="Stampa la trascrizione completa dei messaggi")
     args = parser.parse_args(argv)
 
     if not args.task:
@@ -47,20 +47,20 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     print(f"workspace : {agent.workspace.root}")
-    print(f"model     : {type(agent.llm).__name__}")
-    print(f"tools     : {', '.join(t.name for t in agent.tools)}")
+    print(f"modello   : {type(agent.llm).__name__}")
+    print(f"strumenti: {', '.join(t.name for t in agent.tools)}")
     if len(agent.skills):
-        print(f"skills    : {', '.join(agent.skills.skills)}")
+        print(f"skill     : {', '.join(agent.skills.skills)}")
     print()
 
     result = agent.run(args.task)
 
     print(result.final)
     print()
-    print(f"[{result.stopped_reason}] turns={result.turns} tokens~{result.tokens} calls={len(result.tool_calls)}")
+    print(f"[{result.stopped_reason}] turni={result.turns} token~{result.tokens} chiamate={len(result.tool_calls)}")
 
     if args.transcript:
-        print("\n--- transcript ---")
+        print("\n--- trascrizione ---")
         print(result.transcript())
     if args.json:
         print(

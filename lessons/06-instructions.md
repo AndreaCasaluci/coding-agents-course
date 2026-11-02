@@ -1,165 +1,167 @@
-# 06 — Instructions & Rules Files
+# 06 — Istruzioni e file di regole
 
-> **Objectives**
-> - Write an `AGENTS.md` that changes behaviour.
-> - Reason about precedence when instructions conflict.
-> - Avoid the three anti-patterns that make instruction files useless.
+> **Obiettivi**
+> - Scrivere un `AGENTS.md` che cambia davvero il comportamento.
+> - Ragionare sulla precedenza quando le istruzioni sono in conflitto.
+> - Evitare i tre anti-pattern che rendono inutile un file di istruzioni.
 
-## The problem
+## Il problema
 
-Every session starts cold. Without a persistent instruction file, you retype
-the same context: how to run tests, which directories are frozen, what not to
-touch. That is wasted tokens and inconsistent behaviour.
+Ogni sessione parte da freddo. Senza un file di istruzioni persistente, riscrivi
+lo stesso contesto: come eseguire i test, quali directory sono congelate, cosa non
+toccare. Sono token sprecati e comportamento incoerente.
 
-The convention that has emerged is `AGENTS.md`: plain Markdown at the repo root,
-read automatically, versioned with the code.
+La convenzione emersa è `AGENTS.md`: Markdown semplice nella radice della repo,
+letto automaticamente, versionato con il codice.
 
-## What actually belongs in it
+## Cosa ci deve davvero stare
 
-Three categories, and nothing else:
+Tre categorie, e nient'altro:
 
-### 1. Commands that are not guessable
+### 1. Comandi non intuibili
 
 ```markdown
-## Commands
-- Test: `make test`          (starts a Postgres container)
-- Single test: `pytest tests/test_x.py::test_y`
+## Comandi
+- Test: `make test`          (avvia un container Postgres)
+- Singolo test: `pytest tests/test_x.py::test_y`
 - Lint: `ruff check . && mypy src`
-- Generate protos: `make proto`  (do not hand-edit *_pb2.py)
+- Genera i proto: `make proto`  (non modificare a mano i *_pb2.py)
 ```
 
-The model can guess `pytest`. It cannot guess that the suite needs a database,
-or that generated files must not be edited.
+Il modello può indovinare `pytest`. Non può indovinare che la suite richiede un
+database, né che i file generati non vanno modificati.
 
-### 2. Invariants that are not obvious
+### 2. Invarianti non ovvi
 
 ```markdown
-## Invariants
-- Never commit to `main`; branch first.
-- Public API changes require a changelog entry in `CHANGELOG.md`.
-- Money is integer cents. Never use floats for currency.
-- All DB access goes through `db/repo.py`.
+## Invarianti
+- Mai fare commit su `main`; crea prima un branch.
+- Le modifiche all'API pubblica richiedono una voce in `CHANGELOG.md`.
+- Il denaro è in centesimi interi. Mai usare float per la valuta.
+- Ogni accesso al DB passa da `db/repo.py`.
 ```
 
-These are the rules that, when broken, cost a review cycle or a production
-incident.
+Sono le regole che, se violate, costano un ciclo di revisione o un incidente in
+produzione.
 
-### 3. Traps that cost real time
+### 3. Trappole che costano tempo reale
 
 ```markdown
-## Traps
-- `legacy/` is frozen. Do not refactor it, even if it looks wrong.
-- The test suite is order-dependent; run it whole, not file-by-file.
-- `config/defaults.yaml` is generated from `config/schema.py`.
+## Trappole
+- `legacy/` è congelata. Non fare refactoring, anche se sembra sbagliata.
+- La suite di test dipende dall'ordine; eseguila intera, non file per file.
+- `config/defaults.yaml` è generato da `config/schema.py`.
 ```
 
-## What does not belong
+## Cosa non ci deve stare
 
-| Anti-pattern | Why it fails |
+| Anti-pattern | Perché fallisce |
 |---|---|
-| A style essay ("write clean code") | Too vague to change any decision |
-| Duplicating the README | Stale the moment it changes; two sources of truth |
-| A 500-line architecture doc | Eats the budget; buried rules get ignored |
-| Every rule you can think of | Dilution: the important rule is now 1 of 80 |
-| Aspirational rules nobody follows | Teaches the model that rules are optional |
+| Un saggio sullo stile ("scrivi codice pulito") | Troppo vago per cambiare una decisione |
+| Duplicare il README | Obsoleto appena cambia; due fonti di verità |
+| Un documento di architettura da 500 righe | Mangia il budget; le regole sepolte vengono ignorate |
+| Ogni regola che ti viene in mente | Diluizione: la regola importante è ora 1 su 80 |
+| Regole aspirazionali che nessuno segue | Insegna al modello che le regole sono facoltative |
 
-A good `AGENTS.md` is **30–80 lines**. If it is longer, most of it belongs in
-documentation that the agent can read on demand, or in a skill.
+Un buon `AGENTS.md` ha **30–80 righe**. Se è più lungo, la maggior parte
+appartiene a documentazione che l'agente può leggere su richiesta, o a una skill.
 
-## Precedence
+## Precedenza
 
-Real systems have layers:
-
-```
-user-level instructions      (~/.config/agent/AGENTS.md)   personal, not committed
-        ▲ overridden by
-repo-root AGENTS.md                                        project-wide
-        ▲ overridden by
-subdirectory AGENTS.md                                     scoped to a subtree
-        ▲ overridden by
-the current task / user message                            this session only
-```
-
-Two rules:
-
-1. **Closer wins.** A `backend/AGENTS.md` overrides the root for work under
-   `backend/`.
-2. **Specific beats general.** "Use tabs here" beats "use spaces" if it is
-   more local.
-
-Ambiguity is the enemy. If two files disagree and neither is clearly more
-local, the model will pick one at random and you will not know which.
-
-## Negative instructions are weak
+I sistemi reali hanno livelli:
 
 ```
-Don't use print statements.          ← model may still add one
-Use the logger in `obs/log.py`.      ← actionable
+istruzioni utente         (~/.config/agent/AGENTS.md)   personali, non committate
+        ▲ sovrascritte da
+AGENTS.md nella radice                                  a livello di progetto
+        ▲ sovrascritte da
+AGENTS.md in sottodirectory                             limitate a un sottoalbero
+        ▲ sovrascritte da
+il compito / messaggio utente attuale                   solo questa sessione
 ```
 
-A prohibition tells the model what not to do but not what to do instead. Pair
-every "don't" with a "do", or it will fill the gap with a guess.
+Due regole:
 
-Weak: "Don't break the build."
-Strong: "Before finishing, run `make check` and paste the result."
+1. **Vince il più vicino.** Un `backend/AGENTS.md` sovrascrive la radice per il
+   lavoro sotto `backend/`.
+2. **Il specifico batte il generale.** "Qui usa i tab" batte "usa gli spazi" se è
+   più locale.
 
-## Make it testable
+L'ambiguità è il nemico. Se due file sono in disaccordo e nessuno è chiaramente
+più locale, il modello ne sceglierà uno a caso e tu non saprai quale.
 
-An instruction you cannot verify is a wish. Prefer rules whose violation is
-visible:
-
-- "Run `make test` before declaring done" → check the transcript for the call.
-- "Never edit `legacy/`" → a hook can enforce it (module 08).
-- "Use integer cents" → a lint rule or a test can enforce it.
-
-The progression is: **instruction → hook → test → type system**. Move a rule
-down that ladder as soon as it matters.
-
-## Scoping by directory
-
-Large repos benefit from per-directory instructions:
+## Le istruzioni negative sono deboli
 
 ```
-AGENTS.md                      # repo-wide: commands, invariants
-backend/AGENTS.md              # Django conventions, migration policy
-frontend/AGENTS.md             # component patterns, state management rules
-infra/AGENTS.md                # never apply terraform without a plan file
+Non usare print.                     ← il modello potrebbe comunque aggiungerlo
+Usa il logger in `obs/log.py`.       ← azionabile
 ```
 
-`discover()` in `mini_agent/instructions.py` walks from the workspace root down
-to the working directory, so the model reads general → specific.
+Un divieto dice al modello cosa non fare, ma non cosa fare al suo posto. Abbina
+ogni "non" a un "fai", altrimenti riempirà il vuoto con un'ipotesi.
 
-💡 *In practice* — Tools differ in filename and discovery rules (some read
-`AGENTS.md`, some have their own, some support both). The concept is identical:
-a versioned Markdown file, layered by directory, loaded into the system prompt.
+Debole: "Non rompere la build."
+Forte: "Prima di finire, esegui `make check` e incolla il risultato."
 
-## Lab
+## Rendile verificabili
+
+Un'istruzione che non puoi verificare è un desiderio. Preferisci regole la cui
+violazione è visibile:
+
+- "Esegui `make test` prima di dichiarare finito" → controlla la trascrizione.
+- "Non modificare mai `legacy/`" → un hook può imporlo (modulo 08).
+- "Usa centesimi interi" → una regola di lint o un test può imporlo.
+
+La progressione è: **istruzione → hook → test → sistema di tipi**. Sposta una
+regola più in basso in questa scala appena conta davvero.
+
+## Delimitare per directory
+
+Le repo grandi traggono beneficio da istruzioni per directory:
+
+```
+AGENTS.md                      # a livello di repo: comandi, invarianti
+backend/AGENTS.md              # convenzioni Django, politica migrazioni
+frontend/AGENTS.md             # pattern dei componenti, regole di stato
+infra/AGENTS.md                # mai applicare terraform senza un plan
+```
+
+`discover()` in `mini_agent/instructions.py` risale dalla radice del workspace
+fino alla directory di lavoro, così il modello legge generale → specifico.
+
+💡 *In pratica* — Gli strumenti differiscono per nome del file e regole di
+scoperta (alcuni leggono `AGENTS.md`, altri hanno i propri file, altri entrambi).
+Il concetto è identico: un file Markdown versionato, stratificato per directory,
+caricato nel system prompt.
+
+## Laboratorio
 
 ```bash
 python3 labs/L06_instructions.py
 ```
 
-You will build a small repo with root and subdirectory instruction files, watch
-them render in precedence order, and see a vague instruction fail to change a
-scripted model's behaviour while a specific one succeeds.
+Costruirai una piccola repo con file di istruzioni nella radice e in una
+sottodirectory, li vedrai renderizzati in ordine di precedenza e vedrai
+un'istruzione vaga non cambiare il comportamento di un modello preimpostato,
+mentre una specifica riesce.
 
-🔬 **Break it:** write two conflicting instructions at the same level and see
-which one the model follows. Then fix it by making one more specific.
+🔬 **Fallo fallire:** scrivi due istruzioni in conflitto allo stesso livello e
+guarda quale segue il modello. Poi risolvi rendendone una più specifica.
 
-## ✅ Checkpoint
+## ✅ Verifica
 
-1. What three categories belong in `AGENTS.md`?
-2. Why is "write clean code" a useless instruction?
-3. What is the precedence rule between root and subdirectory files?
-4. Why are negative instructions weak, and what is the fix?
-5. What is the ladder from instruction to enforcement?
+1. Quali tre categorie appartengono a `AGENTS.md`?
+2. Perché "scrivi codice pulito" è un'istruzione inutile?
+3. Qual è la regola di precedenza tra file radice e sottodirectory?
+4. Perché le istruzioni negative sono deboli, e qual è la soluzione?
+5. Qual è la scala dall'istruzione all'imposizione?
 
 <details>
-<summary>Answers</summary>
+<summary>Risposte</summary>
 
-1. Non-guessable commands, non-obvious invariants, time-costing traps.
-2. It does not change any concrete decision; it cannot be violated visibly.
-3. The closer file wins for work in its subtree.
-4. They say what not to do, not what to do; pair with a positive alternative.
-5. Instruction → hook → test → type system.
+1. Comandi non intuibili, invarianti non ovvi, trappole che costano tempo.
+2. Non cambia nessuna decisione concreta; non può essere violata in modo visibile.
+3. Vince il file più vicino per il lavoro nel suo sottoalbero.
+4. Dicono cosa non fare, non cosa fare; abbinale a un'alternativa positiva.
+5. Istruzione → hook → test → sistema di tipi.
 </details>

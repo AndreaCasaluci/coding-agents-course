@@ -1,178 +1,182 @@
-# 13 — Workflows That Work
+# 13 — Flussi di lavoro che funzionano
 
-> **Objectives**
-> - Structure a session so the agent succeeds and you can verify it.
-> - Use TDD and plan-first as control mechanisms, not rituals.
-> - Know when to stop the agent and take over.
+> **Obiettivi**
+> - Strutturare una sessione in modo che l'agente riesca e tu possa verificarlo.
+> - Usare TDD e il piano-prima come meccanismi di controllo, non come riti.
+> - Sapere quando fermare l'agente e prendere in mano la situazione.
 
-## The session shape
-
-```
-1. EXPLORE   read, search, understand        (read-only)
-2. PLAN      state the change, list files    (no edits)
-3. EXECUTE   small edits, one concern        (writes)
-4. VERIFY    tests, types, diff review       (evidence)
-5. REPORT    what changed, what is unproven  (honest summary)
-```
-
-Most failed sessions skip 1–2 and rush to 3. The agent then edits the wrong
-file, and every subsequent turn compounds the error.
-
-### Explore and plan are cheap
-
-Exploration is read-only, so it cannot break anything. Planning costs one turn
-and catches "I misunderstood the task" before it becomes a 30-file diff.
+## La forma della sessione
 
 ```
-"Before changing anything: find where auth tokens are validated, list the
- files involved, and propose a plan. Do not edit yet."
+1. ESPLORA   leggi, cerca, capisci            (sola lettura)
+2. PIANIFICA enuncia la modifica, elenca i file (nessuna modifica)
+3. ESEGUI    modifiche piccole, una questione  (scritture)
+4. VERIFICA  test, tipi, revisione del diff     (prove)
+5. RIPORTA   cosa è cambiato, cosa non è provato (riassunto onesto)
 ```
 
-The `do not edit yet` clause is what makes it a plan. Without it, models start
-writing during the explanation.
+La maggior parte delle sessioni fallite salta 1–2 e si precipita al 3. L'agente
+modifica il file sbagliato, e ogni turno successivo aggrava l'errore.
 
-💡 *In practice* — Some tools have an explicit "plan mode" that mechanically
-blocks writes. That is strictly better than asking nicely, because it is
-enforced (module 08).
+### Esplorare e pianificare costano poco
 
-## TDD is an agent control system
-
-Test-driven development is usually sold as a design practice. For agents it is
-something more useful: **a specification the loop can check.**
+L'esplorazione è in sola lettura, quindi non può rompere nulla. Pianificare costa
+un turno e cattura il "ho capito male il compito" prima che diventi un diff da 30
+file.
 
 ```
-1. Write the failing test (or ask for it, then review it).
-2. Run it. Confirm it fails for the right reason.
-3. Implement until it passes.
-4. Run the whole suite.
-5. Refactor with the suite green.
+"Prima di modificare qualsiasi cosa: trova dove vengono validati i token di
+ autenticazione, elenca i file coinvolti e proponi un piano. Non modificare
+ ancora."
 ```
 
-Why this works so well with agents:
+La clausola `non modificare ancora` è ciò che rende un piano tale. Senza, i
+modelli iniziano a scrivere mentre spiegano.
 
-- The test is a **fixed target**. The model cannot redefine success mid-run.
-- Failure output is **evidence**, which re-enters the loop.
-- The test survives the session and guards future changes.
+💡 *In pratica* — Alcuni strumenti hanno una "modalità piano" esplicita che
+blocca meccanicamente le scritture. È strettamente meglio che chiedere per
+favore, perché è imposto (modulo 08).
 
-The failure mode: the agent writes a test that asserts its own implementation.
-Review the test first, or write it yourself. A test written after the code
-tests that the code does what it does.
+## Il TDD è un sistema di controllo per l'agente
 
-## Small diffs, one concern
+Il test-driven development viene di solito venduto come pratica di design. Per gli
+agenti è qualcosa di più utile: **una specifica che il ciclo può controllare.**
 
-| Diff size | Review reality |
+```
+1. Scrivi il test che fallisce (o fallo scrivere, poi rivedilo).
+2. Eseguilo. Conferma che fallisca per il motivo giusto.
+3. Implementa finché non passa.
+4. Esegui tutta la suite.
+5. Rifattorizza con la suite verde.
+```
+
+Perché funziona così bene con gli agenti:
+
+- Il test è un **bersaglio fisso**. Il modello non può ridefinire il successo a
+  metà esecuzione.
+- L'output del fallimento è **prova**, che rientra nel ciclo.
+- Il test sopravvive alla sessione e protegge le modifiche future.
+
+La modalità di fallimento: l'agente scrive un test che asserisce la propria
+implementazione. Rivedi prima il test, o scrivilo tu. Un test scritto dopo il
+codice verifica che il codice faccia ciò che fa.
+
+## Diff piccoli, una sola questione
+
+| Dimensione del diff | Realtà della revisione |
 |---|---|
-| < 50 lines | read carefully |
-| 50–300 | skim, trust the tests |
-| 300–1000 | rubber stamp |
-| > 1000 | "looks fine" |
+| < 50 righe | leggi con attenzione |
+| 50–300 | scorrri, ti fidi dei test |
+| 300–1.000 | timbro |
+| > 1.000 | "mi sembra ok" |
 
-Agents are happy to produce 2,000-line diffs. That is not productivity; it is
-review debt. Constrain the task:
+Gli agenti producono volentieri diff da 2.000 righe. Non è produttività, è debito
+di revisione. Delimita il compito:
 
 ```
-"Only change src/auth/session.py. Do not touch tests or config."
+"Modifica solo src/auth/session.py. Non toccare test o configurazione."
 ```
 
-Scope is a prompt-level control; hooks and permissions are the enforcement
-(module 12).
+Il perimetro è un controllo a livello di prompt; hook e permessi sono
+l'imposizione (modulo 12).
 
-## Context hygiene
+## Igiene del contesto
 
-- **One task per session.** A session that drifts from "fix login" to "also
-  upgrade React" has a contaminated context and an unreviewable diff.
-- **Start fresh after a failure loop.** If the agent has failed three times,
-  the transcript now contains three failed hypotheses, and they bias the next
-  attempt. New session, better task statement.
-- **Compact deliberately.** Summarise what you learned into the new task
-  statement instead of dragging the whole history.
-- **Keep the working tree clean** before starting, so `git diff` means
-  something.
+- **Un compito per sessione.** Una sessione che scivola da "correggi il login" a
+  "aggiorna anche React" ha un contesto contaminato e un diff non revisionabile.
+- **Ricomincia dopo un ciclo di fallimenti.** Se l'agente ha fallito tre volte,
+  la trascrizione ora contiene tre ipotesi fallite, e condizionano il tentativo
+  successivo. Sessione nuova, compito scritto meglio.
+- **Comprimi deliberatamente.** Riassumi ciò che hai imparato nel nuovo compito
+  invece di trascinarti tutta la cronologia.
+- **Tieni pulito l'albero di lavoro** prima di iniziare, così `git diff`
+  significa qualcosa.
 
-## When to take over
+## Quando prendere il controllo
 
-Stop the agent when:
+Ferma l'agente quando:
 
-- it has made the **same failed attempt twice** (it will make it a third time),
-- the diff is **growing without tests passing**,
-- it is **editing files outside the stated scope**,
-- it is **arguing with the test** instead of fixing the code,
-- you cannot explain the change it just made.
+- ha fatto **lo stesso tentativo fallito due volte** (lo farà una terza),
+- il diff **cresce senza che i test passino**,
+- sta **modificando file fuori dal perimetro dichiarato**,
+- sta **litigando con il test** invece di correggere il codice,
+- non riesci a spiegare la modifica che ha appena fatto.
 
-Taking over is not failure. The point is throughput, and a human fixing a
-5-line bug is often faster than a fourth agent attempt.
+Prendere il controllo non è un fallimento. Il punto è il throughput, e un umano
+che corregge un bug da 5 righe è spesso più veloce di un quarto tentativo
+dell'agente.
 
-## Commit hygiene
+## Igiene dei commit
 
-Agents make commits easy and therefore tempting to make badly.
+Gli agenti rendono i commit facili e quindi tentanti da fare male.
 
-- **One logical change per commit.**
-- **The message explains why**, not just what (the diff shows what).
-- **Never commit secrets**; check `git diff --cached` before committing.
-- **Do not let the agent commit to `main`**; branch first, always.
-- **Review before committing**, not after pushing.
+- **Una modifica logica per commit.**
+- **Il messaggio spiega il perché**, non solo il cosa (il diff mostra il cosa).
+- **Mai committare segreti**; controlla `git diff --cached` prima di committare.
+- **Non lasciare che l'agente committi su `main`**; crea prima un branch.
+- **Rivedi prima di committare**, non dopo il push.
 
-A useful convention: the agent stages and proposes a message; the human
-commits. It keeps the human in the loop at the point where mistakes become
-permanent.
+Una convenzione utile: l'agente prepara lo stage e propone un messaggio; l'umano
+committa. Tiene l'umano nel ciclo nel punto in cui gli errori diventano
+permanenti.
 
-## The review checklist
+## La checklist di revisione
 
-When reviewing an agent diff, ask in this order:
+Quando rivedi il diff di un agente, chiedi in quest'ordine:
 
-1. **Scope** — does it touch only what was asked?
-2. **Correctness** — is there a test, and does it test the right thing?
-3. **Edge cases** — empty, null, large, concurrent, unauthorised.
-4. **Error handling** — does it swallow failures?
-5. **Security** — new inputs, new paths, new network calls?
-6. **Style** — consistent with the surrounding code (least important).
+1. **Perimetro** — tocca solo ciò che è stato chiesto?
+2. **Correttezza** — c'è un test, e testa la cosa giusta?
+3. **Casi limite** — vuoto, null, grande, concorrente, non autorizzato.
+4. **Gestione degli errori** — ingoia i fallimenti?
+5. **Sicurezza** — nuovi input, nuovi percorsi, nuove chiamate di rete?
+6. **Stile** — coerente con il codice circostante (meno importante).
 
-The first two catch most real problems. Style is where reviewers spend most of
-their time.
+Le prime due catturano la maggior parte dei problemi reali. Lo stile è dove i
+revisori passano più tempo.
 
-## Anti-patterns
+## Anti-pattern
 
-| Anti-pattern | Symptom | Fix |
+| Anti-pattern | Sintomo | Soluzione |
 |---|---|---|
-| Vibe-driven development | "looks right", no tests | require evidence |
-| Prompt pile-up | 200-line task statement | plan first, split the task |
-| Context hoarding | one session for a whole day | fresh session per task |
-| Rubber-stamping | 1,000-line diff approved in 2 min | cap diff size |
-| Agent commits everything | noisy history | human commits |
-| Retry until green | flaky test hidden | fix the test |
-| "It said it worked" | no verification | run it yourself |
+| Sviluppo a sensazione | "sembra giusto", niente test | pretendi prove |
+| Accumulo di prompt | compito da 200 righe | pianifica prima, dividi il compito |
+| Accumulo di contesto | una sessione per un'intera giornata | sessione nuova per compito |
+| Timbro | diff da 1.000 righe approvato in 2 minuti | limita la dimensione |
+| L'agente committa tutto | cronologia rumorosa | committa l'umano |
+| Riprova finché è verde | test instabile nascosto | correggi il test |
+| "Ha detto che funziona" | nessuna verifica | eseguilo tu |
 
-## Lab
+## Laboratorio
 
 ```bash
 python3 labs/L13_workflows.py
 ```
 
-You will run the same bug-fix task two ways: a one-shot "fix it" prompt, and the
-explore → plan → test → fix → verify loop. Compare the transcripts, the diff
-size, and the number of turns.
+Eseguirai lo stesso compito di correzione in due modi: un prompt unico "correggi",
+e il ciclo esplora → pianifica → test → correggi → verifica. Confronterai
+trascrizioni, dimensione del diff e numero di turni.
 
-🔬 **Break it:** give the agent a task that spans three concerns and watch the
-diff become unreviewable.
+🔬 **Fallo fallire:** dai all'agente un compito che tocca tre questioni e guarda
+il diff diventare non revisionabile.
 
-## ✅ Checkpoint
+## ✅ Verifica
 
-1. Why are explore and plan the cheapest phases?
-2. Why does TDD work better with agents than with humans?
-3. What is the failure mode of agent-written tests?
-4. When should you stop the agent and take over?
-5. Why review before committing rather than after pushing?
+1. Perché esplorare e pianificare sono le fasi più economiche?
+2. Perché il TDD funziona meglio con gli agenti che con gli umani?
+3. Qual è la modalità di fallimento dei test scritti dall'agente?
+4. Quando devi fermare l'agente e prendere il controllo?
+5. Perché rivedere prima di committare invece che dopo il push?
 
 <details>
-<summary>Answers</summary>
+<summary>Risposte</summary>
 
-1. They are read-only, so they cannot break anything, and they catch
-   misunderstanding before it becomes a large diff.
-2. The test is a fixed target and its failure output is evidence the loop can
-   act on.
-3. The test asserts the implementation rather than the requirement.
-4. Repeated identical failure, growing diff without green tests, scope creep,
-   or a change you cannot explain.
-5. Commits are cheap to fix before they exist and expensive after they are
-   shared.
+1. Sono in sola lettura, quindi non possono rompere nulla, e catturano gli
+   equivoci prima che diventino diff grandi.
+2. Il test è un bersaglio fisso e il suo output di fallimento è una prova su cui
+   il ciclo può agire.
+3. Il test asserisce l'implementazione invece del requisito.
+4. Fallimento identico ripetuto, diff che cresce con i test rossi, scope creep o
+   una modifica che non sai spiegare.
+5. I commit sono economici da correggere prima di esistere e costosi dopo essere
+   stati condivisi.
 </details>

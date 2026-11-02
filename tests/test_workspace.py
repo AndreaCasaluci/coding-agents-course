@@ -64,7 +64,7 @@ class WorkspaceTests(unittest.TestCase):
 
     def test_large_file_truncated(self):
         self.ws.write("big.txt", "x" * 50_000)
-        self.assertIn("truncated", self.ws.read("big.txt"))
+        self.assertIn("troncato", self.ws.read("big.txt"))
 
 
 if __name__ == "__main__":

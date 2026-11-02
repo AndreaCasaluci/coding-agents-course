@@ -1,44 +1,46 @@
-# 03 — Tools & Function Calling
+# 03 — Strumenti e function calling
 
-> **Objectives**
-> - Explain the function-calling round trip precisely.
-> - Write schemas and descriptions that get called correctly.
-> - Design a tool surface small enough to choose from.
+> **Obiettivi**
+> - Spiegare con precisione il giro completo del function calling.
+> - Scrivere schemi e descrizioni che vengono chiamati correttamente.
+> - Progettare una superficie di strumenti abbastanza piccola da poterla
+>   scegliere.
 
-## The round trip
+## Il giro completo
 
 ```
-harness                          model
+harness                          modello
    │                               │
-   │  messages + [tool schemas] ──►│
-   │                               │  decides: call read_file
+   │  messaggi + [schemi tool] ───►│
+   │                               │  decide: chiama read_file
    │◄── assistant.tool_calls ──────│
    │                               │
-   │  executes read_file(...)      │
+   │  esegue read_file(...)        │
    │                               │
-   │  tool message (result) ──────►│
-   │                               │  continues reasoning
+   │  messaggio tool (risultato) ─►│
+   │                               │  continua a ragionare
 ```
 
-The model emits a *request*. The harness validates, executes, and appends the
-result. **The model never runs anything.** This is the security boundary and
-the debugging boundary: if a tool did something wrong, the harness did it.
+Il modello emette una *richiesta*. L'harness valida, esegue e aggiunge il
+risultato. **Il modello non esegue mai nulla.** Questo è il confine di sicurezza
+e il confine di debug: se uno strumento ha fatto qualcosa di sbagliato, l'ha
+fatto l'harness.
 
-## A tool is a prompt
+## Uno strumento è un prompt
 
 ```python
 @tool
 def read_file(path: str, start: int = 1, end: int | None = None) -> str:
-    """Read a text file. Optionally read only lines [start, end]."""
+    """Legge un file di testo. Opzionalmente legge solo le righe [start, end]."""
     ...
 ```
 
-becomes:
+diventa:
 
 ```json
 {
   "name": "read_file",
-  "description": "Read a text file. Optionally read only lines [start, end].",
+  "description": "Legge un file di testo. Opzionalmente legge solo le righe [start, end].",
   "parameters": {
     "type": "object",
     "properties": {
@@ -51,22 +53,23 @@ becomes:
 }
 ```
 
-The description is **prompt text**. "Read a file" and "Read a text file.
-Optionally read only lines [start, end]. Use this before editing." produce
-different behaviour. Write descriptions for the model, not for your IDE.
+La descrizione è **testo di prompt**. "Leggi un file" e "Legge un file di testo.
+Opzionalmente legge solo le righe [start, end]. Usalo prima di modificare."
+producono comportamenti diversi. Scrivi le descrizioni per il modello, non per il
+tuo IDE.
 
-### Schema design rules
+### Regole per gli schemi
 
-| Rule | Why |
+| Regola | Perché |
 |---|---|
-| Flat parameters | Nested objects are where models hallucinate structure |
-| Few parameters | Each one is a chance to get it wrong |
-| Enums over free strings | `mode: "fast" \| "thorough"` beats `mode: "..."` |
-| Defaults for everything optional | Reduces required-field failures |
-| Names that say the verb | `search_code` > `query` |
-| No secrets in defaults | Schemas are sent to a third party |
+| Parametri piatti | Gli oggetti annidati sono dove i modelli inventano struttura |
+| Pochi parametri | Ognuno è un'occasione di sbagliare |
+| Enum invece di stringhe libere | `mode: "fast" \| "thorough"` batte `mode: "..."` |
+| Default per tutto ciò che è opzionale | Riduce gli errori sui campi obbligatori |
+| Nomi che dicono il verbo | `search_code` > `query` |
+| Nessun segreto nei default | Gli schemi vengono inviati a una terza parte |
 
-## Dispatch: validate, execute, contain
+## Dispatch: valida, esegui, contiene
 
 ```python
 def dispatch(self, name, arguments):
@@ -75,112 +78,119 @@ def dispatch(self, name, arguments):
         return ToolResult(False, f"Unknown tool `{name}`")
     if "__parse_error__" in arguments:
         return ToolResult(False, "Could not parse arguments")
-    return tool.run(arguments)          # catches TypeError and Exception
+    return tool.run(arguments)          # cattura TypeError ed Exception
 ```
 
-Three failure classes, all returned as text:
+Tre classi di fallimento, tutte restituite come testo:
 
-1. **Unknown tool** — the model hallucinated a name. Include the available list
-   so it can recover.
-2. **Malformed arguments** — JSON parse error or wrong keys. Say which.
-3. **Tool exception** — the function blew up. Include the type and message.
+1. **Strumento sconosciuto** — il modello ha inventato un nome. Includi l'elenco
+   dei disponibili così può recuperare.
+2. **Argomenti malformati** — errore di parsing JSON o chiavi sbagliate. Dì
+   quali.
+3. **Eccezione dello strumento** — la funzione è esplosa. Includi tipo e
+   messaggio.
 
-Never let a tool exception escape the loop. The model cannot fix a problem it
-cannot see.
+Non lasciare mai che un'eccezione di uno strumento sfugga al ciclo. Il modello
+non può correggere un problema che non vede.
 
-## Tool result design
+## Progettare i risultati
 
-Results go straight into the context window, so their size is a design
-decision:
+I risultati finiscono direttamente nella finestra di contesto, quindi la loro
+dimensione è una scelta di progetto:
 
-- **Truncate at a known limit** and say so: `[truncated: 120k chars, showing 40k]`.
-- **Paginate by lines** for reads; let the model ask for a range.
-- **Summarise noisy commands**: `pytest -q` not `pytest -vv` unless debugging.
-- **Include the location** in search results (`path:line: text`) so the next
-  read is targeted.
-- **Return stable text**, not ANSI colour codes or progress bars.
+- **Tronca a un limite noto** e dillo: `[truncated: 120k chars, showing 40k]`.
+- **Pagina per righe** nelle letture; lascia che il modello chieda un intervallo.
+- **Sintetizza i comandi rumorosi**: `pytest -q`, non `pytest -vv`, se non stai
+  debuggando.
+- **Includi la posizione** nei risultati di ricerca (`path:line: testo`) così la
+  lettura successiva è mirata.
+- **Restituisci testo stabile**, senza codici colore ANSI o barre di
+  avanzamento.
 
-A tool that returns 50k tokens per call will destroy the session in four turns.
-That is a harness bug, not a model bug.
+Uno strumento che restituisce 50k token per chiamata distrugge la sessione in
+quattro turni. È un bug dell'harness, non del modello.
 
-## Side effects
+## Effetti collaterali
 
-Mark tools that change state. The harness uses this for permissions, hooks, and
-UI prompts:
+Marca gli strumenti che cambiano lo stato. L'harness lo usa per permessi, hook e
+prompt dell'interfaccia:
 
 ```python
 @tool(side_effect=True, needs_permission=True)
 def write_file(path: str, content: str) -> str: ...
 ```
 
-Read-only tools can usually run unattended. Writes, deletes, network calls, and
-shell commands need a policy. Module 12 is entirely about that policy.
+Gli strumenti in sola lettura di solito possono girare senza supervisione.
+Scritture, cancellazioni, chiamate di rete e comandi shell hanno bisogno di una
+politica. Il modulo 12 parla interamente di questa politica.
 
-## How many tools?
+## Quanti strumenti?
 
-Two opposing pressures:
+Due pressioni opposte:
 
-- Too few → the model cannot express the task.
-- Too many → selection accuracy drops, schemas eat context, and similar names
-  get confused.
+- Troppo pochi → il modello non può esprimere il compito.
+- Troppi → la precisione di selezione cala, gli schemi mangiano contesto e i
+  nomi simili vengono confusi.
 
-Practical guidance:
+Indicazioni pratiche:
 
-- **Under ~20 tools** is comfortable; beyond that, group or load on demand.
-- **Avoid near-duplicates.** `read_file` and `cat_file` will be confused.
-- **Prefer one flexible tool** over five narrow ones when the parameter space
-  is the same (`search(pattern, glob)` beats `search_py`, `search_js`).
-- **Load tool sets per task** (module 07's progressive disclosure applies to
-  tools too).
+- **Sotto i ~20 strumenti** si sta comodi; oltre, raggruppa o carica su richiesta.
+- **Evita quasi-duplicati.** `read_file` e `cat_file` verranno confusi.
+- **Preferisci uno strumento flessibile** a cinque stretti quando lo spazio dei
+  parametri è lo stesso (`search(pattern, glob)` batte `search_py`, `search_js`).
+- **Carica insiemi di strumenti per compito** (la divulgazione progressiva del
+  modulo 07 vale anche per gli strumenti).
 
-💡 *In practice* — Most coding agents converge on a similar core: read, write,
-edit, list/glob, grep, run command. The differences are in permission models
-and result formatting, not in the verbs.
+💡 *In pratica* — La maggior parte degli agenti di coding converge su un nucleo
+simile: leggi, scrivi, modifica, elenca/glob, grep, esegui comando. Le
+differenze stanno nei modelli di permesso e nella formattazione dei risultati,
+non nei verbi.
 
-## The shell tool is special
+## Lo strumento shell è speciale
 
-A shell tool is the most powerful and most dangerous tool you can expose. It
-subsumes every other tool (`cat`, `sed`, `find`, `git`) and every attack
+Uno strumento shell è il più potente e il più pericoloso che puoi esporre.
+Include ogni altro strumento (`cat`, `sed`, `find`, `git`) e ogni attacco
 (`rm -rf`, `curl | sh`, `git push --force`).
 
-If you expose one, the harness must:
+Se ne esponi uno, l'harness deve:
 
-- run it in a sandbox or with an allowlist,
-- cap output,
-- set a timeout,
-- never pass model text through a shell unquoted.
+- eseguirlo in una sandbox o con una allowlist,
+- limitare l'output,
+- impostare un timeout,
+- non passare mai testo del modello attraverso una shell senza quoting.
 
-Module 12 covers the specifics. For now: treat `run_shell` as a loaded weapon,
-not a convenience.
+Il modulo 12 copre i dettagli. Per ora: tratta `run_shell` come un'arma
+carica, non come una comodità.
 
-## Lab
+## Laboratorio
 
 ```bash
 python3 labs/L03_tools.py
 ```
 
-You will inspect generated schemas, dispatch valid and invalid calls, and watch
-a bad description cause a wrong tool choice in a scripted policy.
+Ispezionerai gli schemi generati, eseguirai chiamate valide e non valide e vedrai
+una descrizione scadente causare la scelta sbagliata in un modello
+preimpostato.
 
-🔬 **Break it:** add a second tool named `read` that also reads files. Watch the
-policy choose the wrong one.
+🔬 **Fallo fallire:** aggiungi un secondo strumento chiamato `read` che legge
+anche i file. Guarda la policy scegliere quello sbagliato.
 
-## ✅ Checkpoint
+## ✅ Verifica
 
-1. Who executes a tool call? What does the model actually emit?
-2. Why are tool errors returned as messages?
-3. Give three schema rules and the failure each prevents.
-4. What is the cost of a tool that returns 50k tokens?
-5. Why is a shell tool categorically different from `read_file`?
+1. Chi esegue una chiamata a uno strumento? Cosa emette davvero il modello?
+2. Perché gli errori degli strumenti vengono restituiti come messaggi?
+3. Elenca tre regole per gli schemi e il fallimento che prevengono.
+4. Qual è il costo di uno strumento che restituisce 50k token?
+5. Perché uno strumento shell è categoricamente diverso da `read_file`?
 
 <details>
-<summary>Answers</summary>
+<summary>Risposte</summary>
 
-1. The harness. The model emits a name + JSON arguments.
-2. So the model can adapt and the run survives.
-3. Flat (hallucinated nesting), enums (invalid values), defaults (missing
-   required fields).
-4. It consumes the context budget and evicts the actual task.
-5. It subsumes all other tools and all destructive operations; its blast radius
-   is the whole machine.
+1. L'harness. Il modello emette un nome + argomenti JSON.
+2. Così il modello può adattarsi e l'esecuzione sopravvive.
+3. Piatti (annidamento inventato), enum (valori non validi), default (campi
+   obbligatori mancanti).
+4. Consuma il budget di contesto ed elimina il compito vero.
+5. Include tutti gli altri strumenti e tutte le operazioni distruttive; il suo
+   raggio d'impatto è l'intera macchina.
 </details>

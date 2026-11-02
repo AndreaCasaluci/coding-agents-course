@@ -3,12 +3,12 @@ PY ?= python3
 .PHONY: help test labs demo clean lint capstone
 
 help:
-	@echo "make test      run the unit test suite"
-	@echo "make labs      run every lab script in order"
-	@echo "make demo      run the agent against this repo"
-	@echo "make capstone  run the capstone evals"
-	@echo "make lint      compile-check every Python file"
-	@echo "make clean     remove caches and scratch output"
+	@echo "make test      esegue la suite di test unitari"
+	@echo "make labs      esegue ogni laboratorio in ordine"
+	@echo "make demo      esegue l'agente su questa repo"
+	@echo "make capstone  esegue le eval del progetto finale"
+	@echo "make lint      controllo di compilazione di ogni file Python"
+	@echo "make clean     rimuove cache e output temporaneo"
 
 test:
 	$(PY) -m unittest discover -s tests -t . -v
@@ -17,7 +17,7 @@ labs:
 	@for f in labs/L*.py; do echo "── $$f"; $(PY) "$$f" || exit 1; done
 
 demo:
-	$(PY) -m mini_agent "list the files in this repo" --audit ''
+	$(PY) -m mini_agent "elenca i file di questa repo" --audit ''
 
 capstone:
 	$(PY) -m capstone.repo_doctor --eval

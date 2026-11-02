@@ -121,7 +121,7 @@ class ContextBudget:
                 candidate = system + [note] + kept
             return candidate
 
-        note = Message("user", f"[{len(dropped)} earlier messages omitted to fit the context budget]")
+        note = Message("user", f"[{len(dropped)} messaggi precedenti omessi per rientrare nel budget di contesto]")
         return system + [note] + kept
 
 
@@ -134,10 +134,10 @@ def summarize_naive(messages: Sequence[Message]) -> str:
     lines: list[str] = []
     for m in messages:
         if m.role == "user":
-            lines.append(f"- user asked: {m.content[:160]}")
+            lines.append(f"- l'utente ha chiesto: {m.content[:160]}")
         elif m.role == "assistant" and m.tool_calls:
             names = ", ".join(c.name for c in m.tool_calls)
-            lines.append(f"- assistant called: {names}")
+            lines.append(f"- l'assistente ha chiamato: {names}")
         elif m.role == "assistant" and m.content:
-            lines.append(f"- assistant said: {m.content[:160]}")
-    return "\n".join(lines[-20:]) or "(nothing notable)"
+            lines.append(f"- l'assistente ha detto: {m.content[:160]}")
+    return "\n".join(lines[-20:]) or "(niente di rilevante)"

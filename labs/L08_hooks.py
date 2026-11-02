@@ -1,9 +1,9 @@
-"""Lab 08 — Hooks: observe, block, mutate, fail closed.
+"""Laboratorio 08 — Hook: osserva, blocca, modifica, fallisci chiuso.
 
-Run: python3 labs/L08_hooks.py
+Esegui: python3 labs/L08_hooks.py
 
-Goal: build a hook bus, watch a denial and a redaction, and see a crashing
-guard fail closed.
+Obiettivo: costruire un bus di hook, vedere un rifiuto e un oscuramento, e
+vedere un guardrail che va in crash fallire chiuso.
 """
 
 from __future__ import annotations
@@ -26,73 +26,73 @@ from mini_agent.llm import ScriptedLLM
 def main() -> None:
     bus = HookBus()
 
-    section("1. OBSERVE")
+    section("1. OSSERVA")
     events: list[dict] = []
     bus.on(PRE_TOOL, lambda p: (events.append(dict(p)), None)[-1], name="collect")
     bus.emit(PRE_TOOL, {"tool": "read_file", "arguments": {"path": "src/a.py"}})
     bus.emit(PRE_TOOL, {"tool": "write_file", "arguments": {"path": "src/b.py"}})
-    print(f"  recorded {len(events)} events")
-    note("Audit hooks are cheap and answer 'what did it actually call?' later.")
+    print(f"  registrati {len(events)} eventi")
+    note("Gli hook di audit sono economici e rispondono dopo a 'cosa ha davvero chiamato?'.")
 
-    section("2. BLOCK")
+    section("2. BLOCCA")
     bus.on(PRE_EDIT, deny_paths((".env", ".git", "secrets")), name="protect-paths")
     for path in (".env", ".git/config", "secrets/prod.yaml", "src/app.py"):
         decision = bus.emit(PRE_EDIT, {"tool": "write_file", "path": path})
-        print(f"  {path:<20} allow={decision.allow!s:<5} {decision.reason}")
+        print(f"  {path:<20} consentito={decision.allow!s:<5} {decision.reason}")
 
-    section("3. MUTATE (REDACT)")
+    section("3. MODIFICA (OSCURA)")
     bus.on(POST_TOOL, redact_secrets(), name="redact")
-    dirty = "token=ghp_" + "a" * 24 + " and key=sk-" + "b" * 20
+    dirty = "token=ghp_" + "a" * 24 + " e chiave=sk-" + "b" * 20
     decision = bus.emit(POST_TOOL, {"tool": "read_file", "content": dirty})
-    print(f"  before: {dirty}")
-    print(f"  after : {decision.payload['content']}")
-    note("Mutation changes what the model believes it saw. Use it for redaction, sparingly.")
+    print(f"  prima: {dirty}")
+    print(f"  dopo : {decision.payload['content']}")
+    note("La modifica cambia ciò che il modello crede di aver visto. Usala per oscurare, con parsimonia.")
 
-    section("4. ORDER AND FIRST-DENIAL-WINS")
+    section("4. ORDINE E PRIMO RIFIUTO CHE VINCE")
     order: list[str] = []
     bus2 = HookBus()
-    bus2.on(PRE_TOOL, lambda p: (order.append("first"), None)[-1], name="first")
-    bus2.on(PRE_TOOL, lambda p: HookResult(False, "stop here"), name="second")
-    bus2.on(PRE_TOOL, lambda p: (order.append("third"), None)[-1], name="third")
+    bus2.on(PRE_TOOL, lambda p: (order.append("primo"), None)[-1], name="primo")
+    bus2.on(PRE_TOOL, lambda p: HookResult(False, "fermati qui"), name="secondo")
+    bus2.on(PRE_TOOL, lambda p: (order.append("terzo"), None)[-1], name="terzo")
     result = bus2.emit(PRE_TOOL, {"tool": "rm_rf"})
-    print(f"  ran: {order}, allow={result.allow}, reason={result.reason}")
-    note("Later hooks do not run after a denial.")
+    print(f"  eseguiti: {order}, consentito={result.allow}, motivo={result.reason}")
+    note("Gli hook successivi non girano dopo un rifiuto.")
 
-    section("5. FAIL CLOSED")
+    section("5. FALLISCI CHIUSO")
     bus3 = HookBus()
-    bus3.on(PRE_TOOL, lambda p: 1 / 0, name="broken-guard")
+    bus3.on(PRE_TOOL, lambda p: 1 / 0, name="guardrail-rotto")
     result = bus3.emit(PRE_TOOL, {"tool": "write_file"})
-    print(f"  allow={result.allow}, reason={result.reason}")
-    note("A crashed safety hook denies. A crashed formatter just skips formatting.")
+    print(f"  consentito={result.allow}, motivo={result.reason}")
+    note("Un hook di sicurezza che va in crash nega. Un formatter rotto salta solo la formattazione.")
 
-    section("6. A FULL RUN WITH GUARDS")
+    section("6. UN'ESECUZIONE COMPLETA CON I GUARDRAIL")
     with temp_ws("hooks") as tmp:
         ws = Workspace(tmp)
-        ws.write("src/app.py", "print('hi')\n")
+        ws.write("src/app.py", "print('ciao')\n")
         bus4 = HookBus()
         bus4.on(PRE_EDIT, deny_paths((".env", ".git")), name="protect-paths")
         bus4.on(POST_TOOL, redact_secrets(), name="redact")
 
         llm = ScriptedLLM(
-            Message("assistant", "Writing the env file.", [ToolCall("c1", "write_file", {"path": ".env", "content": "SECRET=1"})]),
-            Message("assistant", "Reading the log.", [ToolCall("c2", "read_file", {"path": "app.log"})]),
-            "Blocked on the first, redacted the second.",
+            Message("assistant", "Scrivo il file env.", [ToolCall("c1", "write_file", {"path": ".env", "content": "SECRET=1"})]),
+            Message("assistant", "Leggo il log.", [ToolCall("c2", "read_file", {"path": "app.log"})]),
+            "Bloccato il primo, oscurato il secondo.",
         )
-        ws.write("app.log", "key=sk-" + "z" * 24 + "\n")
+        ws.write("app.log", "chiave=sk-" + "z" * 24 + "\n")
         agent = Agent(llm, make_fs_tools(ws), workspace=ws, hooks=bus4, max_turns=5)
-        result = agent.run("write .env then read app.log")
+        result = agent.run("scrivi .env poi leggi app.log")
         for message in result.messages[1:]:
             print("   " + message.text().replace("\n", "\n   ")[:200])
 
-        print(f"\n  .env exists? {ws.resolve('.env').exists()}")
-        note("The denial reached the model as text; the write never happened.")
-        note("The secret in the log was scrubbed before the model saw it.")
+        print(f"\n  .env esiste? {ws.resolve('.env').exists()}")
+        note("Il rifiuto è arrivato al modello come testo; la scrittura non è mai avvenuta.")
+        note("Il segreto nel log è stato ripulito prima che il modello lo vedesse.")
 
-    section("7. HOOKS ARE TESTABLE")
+    section("7. GLI HOOK SONO TESTABILI")
     guard = deny_paths((".env",))
-    print(f"  deny .env      -> {guard({'path': '.env'}).allow}")
-    print(f"  abstain on src -> {guard({'path': 'src/app.py'})}")
-    note("Abstaining (None) matters: a guard that returns True swallows later mutations.")
+    print(f"  nega .env       -> {guard({'path': '.env'}).allow}")
+    print(f"  astieniti su src -> {guard({'path': 'src/app.py'})}")
+    note("L'astensione (None) conta: un guardrail che restituisce True ingoia le modifiche successive.")
 
 
 if __name__ == "__main__":

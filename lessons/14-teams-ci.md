@@ -1,188 +1,201 @@
-# 14 — Teams, CI, Measurement
+# 14 — Team, CI, misurazione
 
-> **Objectives**
-> - Run agents headlessly in CI without giving them the keys to production.
-> - Calibrate trust instead of assuming it.
-> - Choose metrics that survive a CFO review.
+> **Obiettivi**
+> - Eseguire agenti in modalità headless in CI senza dare loro le chiavi della
+>   produzione.
+> - Calibrare la fiducia invece di presumerla.
+> - Scegliere metriche che sopravvivono a una revisione del CFO.
 
-## Two modes of use
+## Due modalità d'uso
 
-| Mode | Human present | Typical use |
+| Modalità | Umano presente | Uso tipico |
 |---|---|---|
-| **Interactive** | yes | exploration, refactors, debugging |
-| **Headless** | no | CI checks, issue triage, scheduled maintenance |
+| **Interattiva** | sì | esplorazione, refactoring, debug |
+| **Headless** | no | controlli CI, triage delle issue, manutenzione programmata |
 
-Headless is where the interesting engineering is, because nobody is there to
-say "wait, don't do that". Every guard from module 12 must be mechanical.
+L'headless è dove sta l'ingegneria interessante, perché nessuno è lì per dire
+"aspetta, non farlo". Ogni guardrail del modulo 12 deve essere meccanico.
 
-## Headless agents in CI
+## Agenti headless in CI
 
 ```
 pull_request
    │
-   ├─ lint / typecheck / test          (deterministic, fast)
-   ├─ agent: review diff               (read-only, posts comments)
-   ├─ agent: fix lint failures         (write, on a branch, no push to main)
-   └─ human review                     (final authority)
+   ├─ lint / typecheck / test          (deterministico, veloce)
+   ├─ agente: rivedi il diff           (sola lettura, commenta)
+   ├─ agente: correggi i lint          (scrittura, su un branch, no push su main)
+   └─ revisione umana                  (autorità finale)
 ```
 
-Rules that keep this sane:
+Regole che tengono la cosa sana:
 
-1. **Read-only by default.** A reviewer agent gets no write token.
-2. **Writes go to a branch**, never to the base branch.
-3. **No secrets in the environment** unless the task genuinely needs them, and
-   then scoped and short-lived.
-4. **Pin the model and prompt version.** Otherwise yesterday's green build
-   means nothing.
-5. **Budget caps.** A per-run token/dollar limit, enforced by the harness.
-6. **Timeouts.** Both per turn and per job.
-7. **Deterministic fallback.** If the agent fails, the pipeline should still
-   produce a useful result (e.g. "review unavailable").
+1. **Sola lettura per default.** Un agente revisore non riceve un token di
+   scrittura.
+2. **Le scritture vanno su un branch**, mai sul branch base.
+3. **Nessun segreto nell'ambiente** a meno che il compito non ne abbia davvero
+   bisogno, e allora delimitato e a breve scadenza.
+4. **Fissa modello e versione del prompt.** Altrimenti la build verde di ieri non
+   significa nulla.
+5. **Limiti di budget.** Un tetto di token/dollari per esecuzione, imposto
+   dall'harness.
+6. **Timeout.** Per turno e per job.
+7. **Fallback deterministico.** Se l'agente fallisce, la pipeline deve comunque
+   produrre un risultato utile (es. "revisione non disponibile").
 
-### What to automate first
+### Cosa automatizzare prima
 
-In order of value:
+In ordine di valore:
 
-1. **Review comments on diffs** — read-only, low risk, immediate value.
-2. **Issue triage / labelling** — low risk, high volume.
-3. **Fixing lint and type errors** — narrow, verifiable.
-4. **Dependency updates** — mechanical, test-gated.
-5. **Feature work** — last, and only with a human in the loop.
+1. **Commenti di revisione sui diff** — sola lettura, rischio basso, valore
+   immediato.
+2. **Triage delle issue / etichette** — rischio basso, volume alto.
+3. **Correzione di errori di lint e tipi** — stretto, verificabile.
+4. **Aggiornamento delle dipendenze** — meccanico, protetto dai test.
+5. **Sviluppo di funzionalità** — per ultimo, e solo con un umano nel ciclo.
 
-Do not start with 5.
+Non iniziare dal 5.
 
-## Trust calibration
+## Calibrare la fiducia
 
-Trust is not binary. It is a per-task property:
+La fiducia non è binaria. È una proprietà per compito:
 
 ```
-task risk = blast radius × reversibility × verifiability
+rischio = raggio d'impatto × reversibilità × verificabilità
 ```
 
-| Task | Blast radius | Reversible | Verifiable | Trust |
+| Compito | Raggio | Reversibile | Verificabile | Fiducia |
 |---|---|---|---|---|
-| Rename a variable | small | yes | yes | high |
-| Add a test | small | yes | yes | high |
-| Fix a bug | medium | yes | yes | medium |
-| Refactor a module | medium | yes | medium | medium |
-| Change a DB schema | large | no | hard | low |
-| Touch auth / payments | large | no | hard | very low |
-| Deploy | huge | no | no | none |
+| Rinominare una variabile | piccolo | sì | sì | alta |
+| Aggiungere un test | piccolo | sì | sì | alta |
+| Correggere un bug | medio | sì | sì | media |
+| Rifattorizzare un modulo | medio | sì | media | media |
+| Cambiare uno schema DB | grande | no | difficile | bassa |
+| Toccare auth / pagamenti | grande | no | difficile | molto bassa |
+| Fare deploy | enorme | no | no | nessuna |
 
-The mistake teams make is applying a single trust level to all of it.
+L'errore che fanno i team è applicare un unico livello di fiducia a tutto.
 
-## Metrics
+## Metriche
 
-Measure outcomes, not activity:
+Misura i risultati, non l'attività:
 
-| Metric | Definition | Why it matters |
+| Metrica | Definizione | Perché conta |
 |---|---|---|
-| **Acceptance rate** | % of agent diffs merged unchanged | signal vs noise |
-| **Revert rate** | % reverted within 30 days | real correctness |
-| **Human edit rate** | lines changed by humans after agent | quality gap |
-| **Cycle time** | issue → merged PR | the actual goal |
-| **Cost per merged PR** | tokens + infra / merged PRs | unit economics |
-| **Escaped defects** | bugs traced to agent changes | risk |
+| **Tasso di accettazione** | % di diff dell'agente integrati senza modifiche | segnale vs rumore |
+| **Tasso di revert** | % ripristinati entro 30 giorni | correttezza reale |
+| **Tasso di modifiche umane** | righe cambiate da umani dopo l'agente | divario di qualità |
+| **Tempo di ciclo** | issue → PR integrata | l'obiettivo vero |
+| **Costo per PR integrata** | token + infrastruttura / PR integrate | economia unitaria |
+| **Difetti sfuggiti** | bug riconducibili a modifiche dell'agente | rischio |
 
-Avoid:
+Evita:
 
-- lines of code generated (rewards verbosity),
-- number of agent sessions (rewards usage),
-- "time saved" self-reported without a baseline.
+- righe di codice generate (premia la verbosità),
+- numero di sessioni dell'agente (premia l'uso),
+- "tempo risparmiato" autodichiarato senza una baseline.
 
-### A cheap baseline experiment
+### Un esperimento di baseline economico
 
-Before rolling out, measure one week without agents: PR cycle time, review
-comments per PR, revert rate. Then measure again. Without a baseline, every
-number is a story.
+Prima del rollout, misura una settimana senza agenti: tempo di ciclo delle PR,
+commenti di revisione per PR, tasso di revert. Poi misura di nuovo. Senza una
+baseline, ogni numero è una storia.
 
-## Review burden
+## Il carico di revisione
 
-The hidden cost is not tokens; it is **review attention**.
+Il costo nascosto non sono i token; è l'**attenzione della revisione**.
 
-A 400-line agent diff takes ~30–60 minutes to review properly. If the agent
-produces five a day, you have created a full-time review job. This is why
-**small diffs and narrow scope are not style preferences — they are the
-economics of the whole practice.**
+Un diff di 400 righe prodotto da un agente richiede ~30–60 minuti per una
+revisione decente. Se l'agente ne produce cinque al giorno, hai creato un lavoro
+a tempo pieno di revisione. Ecco perché **diff piccoli e perimetro stretto non
+sono preferenze di stile — sono l'economia dell'intera pratica.**
 
-Mitigations:
+Mitigazioni:
 
-- cap diff size in the agent's instructions and enforce it with a hook,
-- require tests in the same PR,
-- route trivial changes to a faster review path,
-- make the agent explain *why*, so the reviewer can skim the *what*.
+- limita la dimensione del diff nelle istruzioni e imponilo con un hook,
+- pretendi i test nella stessa PR,
+- instrada le modifiche banali su un percorso di revisione più veloce,
+- fai spiegare all'agente il *perché*, così il revisore può scorrere il *cosa*.
 
-## Policy: what agents may touch
+## Politica: cosa possono toccare gli agenti
 
-Write it down, because "use judgement" produces inconsistent risk:
+Scrivila, perché "usa il buon senso" produce rischi incoerenti:
 
 ```markdown
-## Agent policy
+## Politica per gli agenti
 
-Allowed without review: docs, tests, lint fixes, dependency patches.
-Allowed with review:    application code, CI config.
-Approval required:      migrations, auth, payments, infra, secrets.
-Never:                  force-push, deploy, rotate credentials, delete data.
+Consentito senza revisione: documentazione, test, correzioni di lint, patch
+delle dipendenze.
+Consentito con revisione:    codice applicativo, configurazione CI.
+Approvazione richiesta:      migrazioni, auth, pagamenti, infrastruttura, segreti.
+Mai:                         force-push, deploy, rotazione credenziali, cancellazione dati.
 ```
 
-Put the policy in `AGENTS.md` *and* enforce the important parts in hooks and
-permissions. Policy documents drift; hooks do not.
+Metti la politica in `AGENTS.md` *e* imponi le parti importanti con hook e
+permessi. I documenti di politica derivano; gli hook no.
 
-## Onboarding a team
+## Inserire un team
 
-1. **Shared `AGENTS.md`** — commands, invariants, traps. One file, versioned.
-2. **Shared skills** — the procedures the team repeats (release notes,
-   migrations, incident runbooks).
-3. **Shared hooks** — protect secrets, format on edit, audit calls.
-4. **A starter eval suite** — five cases that encode "what good looks like".
-5. **A review checklist** — so humans review the same things every time.
-6. **A cost dashboard** — so the spend is visible before someone asks.
+1. **`AGENTS.md` condiviso** — comandi, invarianti, trappole. Un file,
+   versionato.
+2. **Skill condivise** — le procedure che il team ripete (note di rilascio,
+   migrazioni, runbook degli incidenti).
+3. **Hook condivisi** — proteggi i segreti, formatta alla modifica, logga le
+   chiamate.
+4. **Una suite di eval iniziale** — cinque casi che codificano "com'è il buon
+   lavoro".
+5. **Una checklist di revisione** — così gli umani rivedono le stesse cose ogni
+   volta.
+6. **Una dashboard dei costi** — così la spesa è visibile prima che qualcuno la
+   chieda.
 
-The order matters: context first, then capability, then guardrails, then
-measurement.
+L'ordine conta: prima il contesto, poi la capacità, poi i guardrail, poi la
+misurazione.
 
-## Governance, briefly
+## Governance, in breve
 
-Questions that come up once agents touch real systems:
+Domande che emergono quando gli agenti toccano sistemi reali:
 
-- **Who is accountable for an agent's commit?** The human who merged it.
-- **Are agent commits labelled?** They should be, for auditability.
-- **Is the transcript retained?** If yes, where, and for how long? It may
-  contain code and secrets.
-- **Can a model provider train on it?** Check the contract, not the marketing.
-- **What is the rollback plan?** Same as for humans: revert, feature flag,
+- **Chi è responsabile del commit di un agente?** L'umano che l'ha integrato.
+- **I commit degli agenti sono etichettati?** Dovrebbero esserlo, per
+  l'auditabilità.
+- **La trascrizione viene conservata?** Se sì, dove e per quanto? Può contenere
+  codice e segreti.
+- **Un provider può addestrare sui dati?** Controlla il contratto, non il
+  marketing.
+- **Qual è il piano di rollback?** Lo stesso degli umani: revert, feature flag,
   redeploy.
 
-## Lab
+## Laboratorio
 
 ```bash
 python3 labs/L14_ci.py
 ```
 
-You will run the harness in a simulated CI job: read-only review mode, a token
-budget, a turn limit, and a machine-readable report. Then you will flip it to
-write mode and watch the permission layer refuse to push to `main`.
+Eseguirai l'harness in un job CI simulato: modalità revisione in sola lettura, un
+budget di token, un limite di turni e un report leggibile dalla macchina. Poi
+passerai alla modalità scrittura e vedrai il livello dei permessi rifiutare il
+push su `main`.
 
-🔬 **Break it:** remove the budget cap and run a policy that loops; watch the
-job hit the wall-clock timeout instead of failing cleanly.
+🔬 **Fallo fallire:** togli il limite di budget ed esegui una policy che entra in
+ciclo; guarda il job colpire il timeout invece di fallire in modo pulito.
 
-## ✅ Checkpoint
+## ✅ Verifica
 
-1. What are the two modes of agent use, and which needs stronger guardrails?
-2. Why should a CI reviewer be read-only?
-3. What makes a task high-risk, in the trust formula?
-4. Why is "lines of code" a bad metric?
-5. Why is review burden the real cost of agent adoption?
+1. Quali sono le due modalità d'uso, e quale richiede guardrail più forti?
+2. Perché un revisore in CI deve essere in sola lettura?
+3. Cosa rende rischioso un compito, nella formula della fiducia?
+4. Perché "righe di codice" è una metrica scadente?
+5. Perché il carico di revisione è il vero costo dell'adozione?
 
 <details>
-<summary>Answers</summary>
+<summary>Risposte</summary>
 
-1. Interactive and headless; headless needs mechanical guardrails because no
-   human is watching.
-2. It cannot accidentally fix things, and a compromised review cannot change
-   the code it reviews.
-3. Large blast radius, irreversible, hard to verify.
-4. It rewards verbosity and measures activity, not outcomes.
-5. Every agent diff consumes human review attention, which is the scarcest
-   resource in the loop.
+1. Interattiva e headless; l'headless richiede guardrail meccanici perché nessun
+   umano sta guardando.
+2. Non può correggere accidentalmente cose, e una revisione compromessa non può
+   modificare il codice che revisiona.
+3. Raggio d'impatto grande, irreversibile, difficile da verificare.
+4. Premia la verbosità e misura l'attività, non i risultati.
+5. Ogni diff dell'agente consuma attenzione umana di revisione, la risorsa più
+   scarsa del ciclo.
 </details>

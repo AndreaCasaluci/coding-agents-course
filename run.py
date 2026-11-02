@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Course runner — works without make.
+"""Runner del corso — funziona senza make.
 
-    python3 run.py test       run the unit test suite
-    python3 run.py labs       run every lab script in order
-    python3 run.py demo       run the agent against this repo
-    python3 run.py capstone   run the capstone evals
-    python3 run.py lint       compile-check every Python file
-    python3 run.py clean      remove caches and scratch output
+    python3 run.py test       esegue la suite di test unitari
+    python3 run.py labs       esegue ogni script di laboratorio in ordine
+    python3 run.py demo       esegue l'agente su questa repo
+    python3 run.py capstone   esegue le eval del capstone
+    python3 run.py lint       controllo di compilazione di ogni file Python
+    python3 run.py clean      rimuove le cache e l'output temporaneo
 """
 
 from __future__ import annotations
@@ -28,21 +28,21 @@ def test() -> int:
 def labs() -> int:
     scripts = sorted((ROOT / "labs").glob("L*.py"))
     if not scripts:
-        print("no labs found")
+        print("nessun laboratorio trovato")
         return 1
     for script in scripts:
         print(f"\n── {script.relative_to(ROOT)}")
         code = subprocess.call([PY, str(script)], cwd=ROOT)
         if code != 0:
-            print(f"lab failed: {script} (exit {code})")
+            print(f"laboratorio fallito: {script} (exit {code})")
             return code
-    print(f"\nall {len(scripts)} labs passed")
+    print(f"\ntutti i {len(scripts)} laboratori passati")
     return 0
 
 
 def demo() -> int:
     return subprocess.call(
-        [PY, "-m", "mini_agent", "list the files in this repo", "--audit", ""], cwd=ROOT
+        [PY, "-m", "mini_agent", "elenca i file di questa repo", "--audit", ""], cwd=ROOT
     )
 
 
@@ -56,7 +56,7 @@ def lint() -> int:
         target = ROOT / folder
         if target.exists():
             ok = compileall.compile_dir(str(target), quiet=1) and ok
-    print("compile ok" if ok else "compile failed")
+    print("compilazione ok" if ok else "compilazione fallita")
     return 0 if ok else 1
 
 
@@ -65,7 +65,7 @@ def clean() -> int:
         shutil.rmtree(path, ignore_errors=True)
     for name in (".mini_agent", "sandbox", ".pytest_cache"):
         shutil.rmtree(ROOT / name, ignore_errors=True)
-    print("cleaned")
+    print("pulito")
     return 0
 
 
@@ -85,7 +85,7 @@ def main(argv: list[str]) -> int:
         return 0
     command = COMMANDS.get(argv[0])
     if command is None:
-        print(f"unknown command: {argv[0]}\n")
+        print(f"comando sconosciuto: {argv[0]}\n")
         print(__doc__)
         return 2
     return command()

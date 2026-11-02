@@ -1,9 +1,9 @@
-"""Lab 00 — Read a transcript.
+"""Laboratorio 00 — Leggere una trascrizione.
 
-Run: python3 labs/L00_orientation.py
+Esegui: python3 labs/L00_orientation.py
 
-Goal: see one complete agent run as data, and identify which parts came from
-the model and which from the environment.
+Obiettivo: vedere un'esecuzione completa dell'agente come dato, e identificare
+quali parti vengono dal modello e quali dall'ambiente.
 """
 
 from _helpers import note, section, temp_ws
@@ -27,14 +27,14 @@ def main() -> None:
         ws = Workspace(tmp)
         ws.write("src/dates.py", DATES)
 
-        # The scripted model stands in for a real one. Every Message here is
-        # something a model could have produced.
+        # Il modello preimpostato sostituisce uno vero. Ogni Message qui è
+        # qualcosa che un modello avrebbe potuto produrre.
         llm = ScriptedLLM(
-            Message("assistant", "I'll locate parse_date.", [ToolCall("c1", "search", {"pattern": "def parse_date"})]),
-            Message("assistant", "Reading the function.", [ToolCall("c2", "read_file", {"path": "src/dates.py"})]),
+            Message("assistant", "Localizzo parse_date.", [ToolCall("c1", "search", {"pattern": "def parse_date"})]),
+            Message("assistant", "Leggo la funzione.", [ToolCall("c2", "read_file", {"path": "src/dates.py"})]),
             Message(
                 "assistant",
-                "Empty input will raise a confusing ValueError from strptime. Add an explicit guard.",
+                "Un input vuoto farà sollevare a strptime un ValueError poco chiaro. Aggiungo un controllo esplicito.",
                 [
                     ToolCall(
                         "c3",
@@ -42,41 +42,41 @@ def main() -> None:
                         {
                             "path": "src/dates.py",
                             "old": "def parse_date(s):\n    return datetime.strptime(s, FMT)",
-                            "new": "def parse_date(s):\n    if not s:\n        raise ValueError(\"empty date\")\n    return datetime.strptime(s, FMT)",
+                            "new": "def parse_date(s):\n    if not s:\n        raise ValueError(\"data vuota\")\n    return datetime.strptime(s, FMT)",
                         },
                     )
                 ],
             ),
-            "Added an empty-string guard to parse_date.",
+            "Aggiunto un controllo per la stringa vuota a parse_date.",
         )
 
         agent = Agent(llm, make_fs_tools(ws), workspace=ws, max_turns=8)
-        result = agent.run("parse_date crashes on empty input. Fix it.")
+        result = agent.run("parse_date va in crash su input vuoto. Correggila.")
 
-        section("TRANSCRIPT")
+        section("TRASCRIZIONE")
         for i, message in enumerate(result.messages):
-            print(f"\n--- message {i} ---")
+            print(f"\n--- messaggio {i} ---")
             print(message.text())
 
-        section("ANNOTATION")
+        section("ANNOTAZIONE")
         by_role: dict[str, int] = {}
         for message in result.messages:
             by_role[message.role] = by_role.get(message.role, 0) + 1
-        note(f"messages by role: {by_role}")
-        note(f"model calls (assistant messages): {by_role.get('assistant', 0)}")
-        note(f"tool executions (tool messages):  {by_role.get('tool', 0)}")
-        note(f"tool calls requested:             {len(result.tool_calls)}")
-        note(f"estimated tokens at the end:      {transcript_tokens(result.messages)}")
-        note(f"stopped because:                  {result.stopped_reason}")
+        note(f"messaggi per ruolo: {by_role}")
+        note(f"chiamate al modello (messaggi assistant): {by_role.get('assistant', 0)}")
+        note(f"esecuzioni di strumenti (messaggi tool):  {by_role.get('tool', 0)}")
+        note(f"chiamate a strumenti richieste:           {len(result.tool_calls)}")
+        note(f"token stimati alla fine:                   {transcript_tokens(result.messages)}")
+        note(f"motivo di arresto:                         {result.stopped_reason}")
 
-        section("THE FILE AFTER THE RUN")
+        section("IL FILE DOPO L'ESECUZIONE")
         print(ws.read("src/dates.py"))
 
-        section("WHAT TO NOTICE")
-        note("Assistant messages are guesses. Tool messages are observations.")
-        note("The model never ran anything; the harness did, and pasted results back.")
-        note("The run ended when an assistant message had no tool calls.")
-        note("Turn count == assistant messages, not tool calls.")
+        section("COSA NOTARE")
+        note("I messaggi dell'assistente sono ipotesi. I messaggi tool sono osservazioni.")
+        note("Il modello non ha eseguito nulla; l'ha fatto l'harness, incollando i risultati.")
+        note("L'esecuzione è finita quando un messaggio dell'assistente non aveva chiamate.")
+        note("Il numero di turni == messaggi dell'assistente, non chiamate agli strumenti.")
 
 
 if __name__ == "__main__":

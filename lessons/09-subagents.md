@@ -1,185 +1,189 @@
-# 09 — Subagents & Orchestration
+# 09 — Subagenti e orchestrazione
 
-> **Objectives**
-> - Decide when a subagent is worth its cost.
-> - Explain the isolation trade-off in both directions.
-> - Run parallel work without corrupting the workspace.
+> **Obiettivi**
+> - Decidere quando un subagente vale il suo costo.
+> - Spiegare il compromesso dell'isolamento in entrambe le direzioni.
+> - Eseguire lavoro in parallelo senza corrompere il workspace.
 
-## The economics
+## L'economia
 
-A subagent is a **context compressor with a network call in the middle**.
+Un subagente è **un compressore di contesto con una chiamata di rete in mezzo**.
 
 ```
-parent context:  12,000 tokens
-subagent run:    40,000 tokens of exploration
-returned:           300 tokens of conclusion
+contesto del padre:  12.000 token
+esecuzione del figlio: 40.000 token di esplorazione
+restituiti:              300 token di conclusione
 ```
 
-You spent 40k tokens to save 40k tokens of parent context. That is only a win
-if:
+Hai speso 40k token per risparmiare 40k token di contesto del padre. È un
+guadagno solo se:
 
-- the exploration is genuinely large (many files, many dead ends),
-- the conclusion is compact and verifiable,
-- the parent does not need the raw evidence.
+- l'esplorazione è davvero grande (molti file, molti vicoli ciechi),
+- la conclusione è compatta e verificabile,
+- il padre non ha bisogno delle prove grezze.
 
-If the parent needs the diff, the test output, or the reasoning, do the work
-inline. A summary cannot be re-read.
+Se il padre ha bisogno del diff, dell'output dei test o del ragionamento, fai il
+lavoro inline. Un riassunto non si può rileggere.
 
-## When to delegate
+## Quando delegare
 
-| Delegate | Keep inline |
+| Delega | Tieni inline |
 |---|---|
-| "Find every call site of X" | "Fix this one function" |
-| "Audit this module for injection risks" | "Add a null check" |
-| "Run the test suite and report failures" | "Make this test pass" |
-| "Review this diff for bugs" | "Implement the feature" |
-| Independent, read-only investigations | Anything with shared, evolving state |
+| "Trova ogni punto di chiamata di X" | "Correggi questa funzione" |
+| "Analizza questo modulo per rischi di injection" | "Aggiungi un controllo su null" |
+| "Esegui la suite e riporta i fallimenti" | "Fai passare questo test" |
+| "Rivedi questo diff per bug" | "Implementa la funzionalità" |
+| Indagini indipendenti in sola lettura | Qualsiasi cosa con stato condiviso ed evolutivo |
 
-The pattern that works best: **fan out for reading, serialise for writing.**
+Il pattern che funziona meglio: **espandi in parallelo per leggere, serializza
+per scrivere.**
 
-## Isolation, both directions
-
-```
-parent transcript ──X──► child          (no parent history leaks in)
-child transcript  ──X──► parent         (only the summary comes back)
-workspace         ─────► shared         (edits persist)
-```
-
-The `X`s are the feature. The child cannot ask clarifying questions, cannot see
-what the parent already ruled out, and does not know the user's tone. So the
-task statement must be **self-contained**:
+## Isolamento, in entrambe le direzioni
 
 ```
-Bad : "Fix the thing we discussed."
-Good: "In repo /work/app, find why `test_checkout` fails. Report the root
-       cause and the file:line, do not edit anything."
+trascrizione padre ──X──► figlio        (nessuna cronologia del padre entra)
+trascrizione figlio ──X──► padre        (torna solo il riassunto)
+workspace            ─────► condiviso   (le modifiche persistono)
 ```
 
-The last clause matters: without it, a read-only investigation will start
-editing.
-
-## The telephone game
-
-A subagent returns prose. Prose loses detail. The parent then acts on the lossy
-version.
+Le `X` sono la funzionalità. Il figlio non può fare domande di chiarimento, non
+sa cosa il padre ha già escluso e non conosce il tono dell'utente. Quindi il
+compito deve essere **autosufficiente**:
 
 ```
-child:  "the bug is in the retry logic in client.py:88"
-parent: "fix the retry logic in client.py"
-→ parent edits the wrong retry (there are three)
+Male : "Correggi quella cosa di cui abbiamo parlato."
+Bene : "Nella repo /work/app, scopri perché `test_checkout` fallisce. Riporta
+        causa radice e file:riga, senza modificare nulla."
 ```
 
-Mitigations:
+L'ultima clausola conta: senza, un'indagine in sola lettura inizia a modificare.
 
-- Require **structured output**: `file:line`, exact identifiers, test names.
-- Require the child to **quote** the evidence, not paraphrase it.
-- Make the summary **verifiable**: the parent re-reads the cited location.
-- Prefer children that return *diffs or patches* over descriptions, when they
-  are allowed to write.
+## Il gioco del telefono
 
-## Parallelism and races
+Un subagente restituisce prosa. La prosa perde dettagli. Il padre agisce sulla
+versione impoverita.
+
+```
+figlio:  "il bug è nella logica di retry in client.py:88"
+padre:   "correggi la logica di retry in client.py"
+→ il padre modifica il retry sbagliato (ce ne sono tre)
+```
+
+Mitigazioni:
+
+- Richiedi **output strutturato**: `file:riga`, identificatori esatti, nomi dei
+  test.
+- Richiedi che il figlio **citi** le prove, non le parafrasi.
+- Rendi il riassunto **verificabile**: il padre rilegge il punto citato.
+- Preferisci figli che restituiscono *diff o patch* invece di descrizioni,
+  quando possono scrivere.
+
+## Parallelismo e race condition
 
 ```python
 results = run_parallel(parent, {
-    "security": "audit src/ for injection",
-    "tests":    "run the suite, report failures",
+    "security": "analizza src/ per injection",
+    "tests":    "esegui la suite, riporta i fallimenti",
 })
 ```
 
-This is safe only because both jobs are read-only. If two agents write to the
-same file:
+È sicuro solo perché entrambi i lavori sono in sola lettura. Se due agenti
+scrivono lo stesso file:
 
 ```
-agent A reads app.py (v1)
-agent B reads app.py (v1)
-A writes v2
-B writes v3, based on v1  → A's change is gone
+agente A legge app.py (v1)
+agente B legge app.py (v1)
+A scrive v2
+B scrive v3, basato su v1  → la modifica di A è sparita
 ```
 
-Options, best first:
+Opzioni, dalla migliore:
 
-1. **Don't parallelise writes.** Serialise, or partition by file ownership.
-2. **Worktrees.** One checkout per agent, merge afterwards. Conflicts become
-   visible merges instead of silent overwrites.
-3. **File locks.** Cheap, but agents retry and stall; only for coarse
-   partitioning.
+1. **Non parallelizzare le scritture.** Serializza o partiziona per proprietario
+   del file.
+2. **Worktree.** Un checkout per agente, merge dopo. I conflitti diventano merge
+   visibili invece di sovrascritture silenziose.
+3. **Lock sui file.** Economici, ma gli agenti ritentano e si bloccano; solo per
+   partizioni grossolane.
 
-The `run_parallel` helper in `mini_agent/subagents.py` says this out loud: it is
-honest about being unsafe for writes.
+L'helper `run_parallel` in `mini_agent/subagents.py` lo dice ad alta voce: è
+onesto sul fatto di non essere sicuro per le scritture.
 
-## The review pattern
+## Il pattern della revisione
 
-The highest-value orchestration pattern in practice:
+Il pattern di orchestrazione con più valore in pratica:
 
 ```
-implementer (writes the change)
+implementatore (scrive la modifica)
         │
         ▼  diff
-reviewer (fresh context, no knowledge of intent)
+revisore (contesto pulito, non conosce l'intento)
         │
-        ▼  findings: file:line + severity + suggestion
-implementer (addresses findings)
+        ▼  risultati: file:riga + gravità + suggerimento
+implementatore (affronta i risultati)
 ```
 
-The reviewer's value comes from **not knowing why** the change was made. It
-reads the diff cold, like a colleague would. A reviewer that shares the
-implementer's context inherits its blind spots.
+Il valore del revisore viene dal **non sapere perché** la modifica è stata fatta.
+Legge il diff a freddo, come farebbe un collega. Un revisore che condivide il
+contesto dell'implementatore eredita i suoi punti ciechi.
 
-Two rules:
+Due regole:
 
-- The reviewer must be **read-only**. A reviewer that can edit will "helpfully"
-  rewrite things.
-- The reviewer must **cite lines**. "This could be cleaner" is noise.
+- Il revisore deve essere **in sola lettura**. Un revisore che può modificare
+  "aiuterà" riscrivendo cose.
+- Il revisore deve **citare le righe**. "Si potrebbe pulire" è rumore.
 
-## Cost model
+## Modello di costo
 
-| Run | Turns | Context/turn | Relative cost |
+| Esecuzione | Turni | Contesto/turno | Costo relativo |
 |---|---|---|---|
-| Inline exploration | 20 | growing to 30k | 1.0× |
-| Subagent exploration | 25 (child) | capped at 15k | ~0.6× parent + child |
-| Parallel read-only ×3 | 15 each | 10k each | ~1.5×, 3× faster |
+| Esplorazione inline | 20 | cresce fino a 30k | 1,0× |
+| Esplorazione con subagente | 25 (figlio) | limitato a 15k | ~0,6× padre + figlio |
+| Parallelo in lettura ×3 | 15 ciascuno | 10k ciascuno | ~1,5×, 3× più veloce |
 
-Subagents are not free. They are a way to trade **money and latency** for
-**context headroom and parallelism**. Measure before adopting.
+I subagenti non sono gratuiti. Sono un modo per scambiare **denaro e latenza**
+con **spazio nel contesto e parallelismo**. Misura prima di adottarli.
 
-## Failure modes
+## Modalità di fallimento
 
-| Failure | Cause | Fix |
+| Fallimento | Causa | Soluzione |
 |---|---|---|
-| Child does the wrong task | Ambiguous task statement | Self-contained prompt with scope |
-| Parent misapplies the summary | Lossy prose | Structured output + verify citation |
-| Duplicated work | Parent also investigated | Explicit division of labour |
-| Silent overwrite | Parallel writes | Serialise or worktrees |
-| Runaway fan-out | Child spawns children | Depth limit, turn budget per child |
-| Cost blow-up | Many children, long runs | Cap count and turns; log token spend |
+| Il figlio fa il compito sbagliato | Compito ambiguo | Prompt autosufficiente con perimetro |
+| Il padre applica male il riassunto | Prosa lossy | Output strutturato + verifica della citazione |
+| Lavoro duplicato | Anche il padre ha indagato | Divisione del lavoro esplicita |
+| Sovrascrittura silenziosa | Scritture parallele | Serializza o usa worktree |
+| Fan-out fuori controllo | Il figlio genera figli | Limite di profondità, budget per figlio |
+| Costo esploso | Molti figli, esecuzioni lunghe | Limita numero e turni; logga i token |
 
-## Lab
+## Laboratorio
 
 ```bash
 python3 labs/L09_subagents.py
 ```
 
-You will run a parent that delegates two read-only investigations, inspect the
-child transcripts (system + user only), and confirm the parent's context stays
-small. Then you will reproduce a write race and fix it with serialisation.
+Eseguirai un padre che delega due indagini in sola lettura, ispezionerai le
+trascrizioni dei figli (solo system + user) e confermerai che il contesto del
+padre resta piccolo. Poi riprodurrai una race di scrittura e la risolverai
+serializzando.
 
-🔬 **Break it:** have two children write the same file and diff the result.
+🔬 **Fallo fallire:** fai scrivere lo stesso file a due figli e confronta il
+risultato.
 
-## ✅ Checkpoint
+## ✅ Verifica
 
-1. What does a subagent trade away, and what does it buy?
-2. Why must a delegation prompt be self-contained?
-3. Why is the review pattern stronger with a fresh context?
-4. When is parallel writing safe?
-5. What is the telephone-game failure and how do you mitigate it?
+1. Cosa cede un subagente, e cosa compra?
+2. Perché il prompt di delega deve essere autosufficiente?
+3. Perché il pattern della revisione è più forte con un contesto pulito?
+4. Quando la scrittura parallela è sicura?
+5. Qual è il fallimento del gioco del telefono e come lo mitighi?
 
 <details>
-<summary>Answers</summary>
+<summary>Risposte</summary>
 
-1. Trades fidelity/evidence and money for context headroom and parallelism.
-2. The child sees no parent history and cannot ask questions.
-3. It does not inherit the implementer's assumptions and blind spots.
-4. Only with disjoint files or separate worktrees; otherwise serialise.
-5. Summaries lose detail and the parent acts on the loss; require structured,
-   cited, verifiable output.
+1. Cede fedeltà/prove e denaro; compra spazio nel contesto e parallelismo.
+2. Il figlio non vede la cronologia del padre e non può fare domande.
+3. Non eredita le assunzioni e i punti ciechi dell'implementatore.
+4. Solo con file disgiunti o worktree separati; altrimenti serializza.
+5. I riassunti perdono dettagli e il padre agisce sulla perdita; richiedi output
+   strutturato, citato e verificabile.
 </details>

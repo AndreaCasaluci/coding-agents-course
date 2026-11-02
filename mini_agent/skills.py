@@ -43,9 +43,9 @@ class Skill:
     def read_resource(self, rel: str) -> str:
         target = (self.path / rel).resolve()
         if self.path.resolve() not in target.parents and target != self.path.resolve():
-            raise SkillError(f"Resource escapes skill folder: {rel}")
+            raise SkillError(f"La risorsa esce dalla cartella della skill: {rel}")
         if not target.is_file():
-            raise SkillError(f"No such resource: {rel}")
+            raise SkillError(f"Risorsa inesistente: {rel}")
         return target.read_text(encoding="utf-8", errors="replace")
 
 
@@ -56,16 +56,16 @@ def parse_skill(path: Path) -> Skill:
     text = path.read_text(encoding="utf-8")
     match = _FRONTMATTER.match(text)
     if not match:
-        raise SkillError(f"{path}: missing YAML frontmatter (--- name: ... ---)")
+        raise SkillError(f"{path}: manca il frontmatter YAML (--- name: ... ---)")
     meta = _parse_frontmatter(match.group(1))
     body = match.group(2).strip()
 
     name = meta.get("name") or path.parent.name
     description = meta.get("description", "").strip()
     if not description:
-        raise SkillError(f"{path}: frontmatter needs a `description` — it is the trigger")
+        raise SkillError(f"{path}: il frontmatter richiede una `description` — è l'innesco")
     if len(description) > 1024:
-        raise SkillError(f"{path}: description is {len(description)} chars; keep it under 1024")
+        raise SkillError(f"{path}: la descrizione ha {len(description)} caratteri; tienila sotto 1024")
 
     resources = sorted(
         str(p.relative_to(path.parent))
@@ -114,7 +114,7 @@ class SkillLibrary:
                 skills.append(parse_skill(skill_md))
             except SkillError as exc:
                 # A broken skill should not take down the session. Warn, skip.
-                print(f"[skills] skipping {skill_md}: {exc}")
+                print(f"[skills] salto {skill_md}: {exc}")
         return cls(skills)
 
     def __len__(self) -> int:
@@ -130,10 +130,10 @@ class SkillLibrary:
         """L2: the full procedure, injected when the task matches."""
         skill = self.skills.get(name)
         if skill is None:
-            raise SkillError(f"Unknown skill `{name}`. Available: {', '.join(self.skills)}")
+            raise SkillError(f"Skill sconosciuta: `{name}`. Disponibili: {', '.join(self.skills)}")
         extra = ""
         if skill.resources:
-            extra = "\n\nResources you may read on demand:\n" + "\n".join(f"- {r}" for r in skill.resources)
+            extra = "\n\nRisorse che puoi leggere su richiesta:\n" + "\n".join(f"- {r}" for r in skill.resources)
         return f"# Skill: {skill.name}\n\n{skill.body}{extra}"
 
     def match(self, task: str) -> list[Skill]:

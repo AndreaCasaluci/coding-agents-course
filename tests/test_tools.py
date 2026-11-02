@@ -34,13 +34,13 @@ class ToolTests(unittest.TestCase):
         reg = ToolRegistry([add])
         result = reg.dispatch("nope", {})
         self.assertFalse(result.ok)
-        self.assertIn("Unknown tool", result.content)
+        self.assertIn("Strumento sconosciuto", result.content)
 
     def test_bad_arguments_are_reported(self):
         reg = ToolRegistry([add])
         result = reg.dispatch("add", {"wrong": 1})
         self.assertFalse(result.ok)
-        self.assertIn("Invalid arguments", result.content)
+        self.assertIn("Argomenti non validi", result.content)
 
     def test_tool_exception_is_contained(self):
         reg = ToolRegistry([boom])
@@ -52,7 +52,7 @@ class ToolTests(unittest.TestCase):
         reg = ToolRegistry([add])
         result = reg.dispatch("add", {"__parse_error__": "{not json"})
         self.assertFalse(result.ok)
-        self.assertIn("parse", result.content.lower())
+        self.assertIn("argomenti", result.content.lower())
 
     def test_duplicate_registration_rejected(self):
         reg = ToolRegistry([add])

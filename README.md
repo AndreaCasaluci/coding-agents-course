@@ -1,89 +1,91 @@
-# AI Coding Agents — A Crash Course from Zero
+> 🇬🇧 [English (main)](https://github.com/AndreaCasaluci/coding-agents-course/blob/main/README.md) · 🇮🇹 **Italiano**
 
-A vendor-neutral, hands-on course about how AI coding agents actually work:
-the loop, the context, the tools, the guardrails, and the workflows that make
-them useful instead of dangerous.
+# Agenti di coding AI — Un corso intensivo da zero
 
-No prior agent experience assumed. Some Python and Git familiarity helps.
+Un corso pratico e indipendente dai vendor su come funzionano davvero gli agenti di coding AI:
+il ciclo, il contesto, gli strumenti, i guardrail e i flussi di lavoro che li rendono
+utili invece che pericolosi.
 
-## Why this exists
+Non serve esperienza pregressa con gli agenti. Un po' di familiarità con Python e Git aiuta.
 
-Most material about coding agents is either marketing or a manual for one
-specific product. This course teaches the *mechanics* — the parts every agent
-shares — so that whatever tool you pick up next (Claude Code, Codex, Cursor,
-Copilot, Aider, OpenCode, something that ships next year) is a variation on a
-model you already understand.
+## Perché esiste
 
-The core idea: **you cannot debug what you cannot name.** By the end you will
-be able to name every moving part of an agent run and point at the one that
-broke.
+La maggior parte del materiale sugli agenti di coding è o marketing o un manuale per uno
+specifico prodotto. Questo corso insegna la *meccanica* — le parti che ogni agente
+condivide — così che qualunque strumento tu prenda in mano dopo (Claude Code, Codex, Cursor,
+Copilot, Aider, OpenCode, qualcosa che uscirà l'anno prossimo) sia una variante di un
+modello che già capisci.
 
-## How the course works
+L'idea centrale: **non puoi fare debug di ciò che non sai nominare.** Alla fine saprai
+nominare ogni parte in movimento di un'esecuzione dell'agente e indicare quella che
+si è rotta.
+
+## Come funziona il corso
 
 ```
-lessons/       16 modules, read in order
-mini_agent/    a toy agent harness you build up, one module at a time
-labs/          one runnable script per module
-capstone/      a real project that uses everything
-docs/          cheat sheet and reading list
-tests/         58 unit tests over the harness
+lessons/       16 moduli, da leggere in ordine
+mini_agent/    un harness per agenti giocattolo che costruisci, un modulo alla volta
+labs/          uno script eseguibile per modulo
+capstone/      un progetto reale che usa tutto
+docs/          cheat sheet e lista di letture
+tests/         58 test unitari sull'harness
 ```
 
-Every module has the same shape:
+Ogni modulo ha la stessa forma:
 
-1. **Objectives** — what you should be able to do afterwards.
-2. **Lesson** — the concept, with diagrams and the failure modes.
-3. **Lab** — runnable code that demonstrates the concept, not a toy example
-   that only prints "hello".
-4. **Checkpoint** — questions you should be able to answer cold.
+1. **Obiettivi** — cosa dovresti essere in grado di fare dopo.
+2. **Lezione** — il concetto, con diagrammi e le modalità di fallimento.
+3. **Laboratorio** — codice eseguibile che dimostra il concetto, non un esempio
+   giocattolo che stampa solo "hello".
+4. **Verifica** — domande a cui dovresti saper rispondere a memoria.
 
-The `mini_agent/` package grows across the course. By module 15 it is a small
-but complete agent: LLM abstraction, tool registry, sandboxed filesystem,
-context budgeting, instruction loading, skills, hooks, subagents, an
-MCP-shaped protocol, and an eval runner. It is not production software — it is
-a *readable* reference implementation of every concept in the lessons.
+Il pacchetto `mini_agent/` cresce lungo il corso. Al modulo 15 è un agente piccolo
+ma completo: astrazione LLM, registro degli strumenti, filesystem in sandbox,
+budget del contesto, caricamento delle istruzioni, skill, hook, subagenti, un
+protocollo a forma di MCP e un runner di eval. Non è software di produzione — è
+un'implementazione di riferimento *leggibile* di ogni concetto delle lezioni.
 
-## Quickstart
+## Avvio rapido
 
 ```bash
 git clone https://github.com/AndreaCasaluci/coding-agents-course.git && cd coding-agents-course
 
-# No dependencies. Python 3.10+.
+# Nessuna dipendenza. Python 3.10+.
 python3 -m mini_agent --help
 python3 -m mini_agent "list the files and summarise the repo"
 
-# Run every lab and test
+# Esegui ogni laboratorio e test
 python3 run.py test
 python3 run.py labs
 ```
 
-`run.py` is a tiny stdlib runner so you do not need `make`. If you have it,
-`make test` / `make labs` do the same thing.
+`run.py` è un piccolo runner stdlib così non ti serve `make`. Se ce l'hai,
+`make test` / `make labs` fanno la stessa cosa.
 
-The harness ships with a **scripted mock model** so everything works offline
-with zero API keys. Set `MINI_AGENT_PROVIDER=openai` and `OPENAI_API_KEY` to
-run the same code against a real model.
+L'harness include un **modello mock scriptato** così tutto funziona offline
+senza chiavi API. Imposta `MINI_AGENT_PROVIDER=openai` e `OPENAI_API_KEY` per
+eseguire lo stesso codice contro un modello reale.
 
-## Start here
+## Inizia da qui
 
-1. Read [`CURRICULUM.md`](CURRICULUM.md) — the map.
-2. Open [`lessons/00-orientation.md`](lessons/00-orientation.md).
-3. Tick boxes in [`PROGRESS.md`](PROGRESS.md) as you go.
-4. Keep [`docs/cheatsheet.md`](docs/cheatsheet.md) open while you work.
+1. Leggi [`CURRICULUM.md`](CURRICULUM.md) — la mappa.
+2. Apri [`lessons/00-orientation.md`](lessons/00-orientation.md).
+3. Spunta le caselle in [`PROGRESS.md`](PROGRESS.md) man mano che procedi.
+4. Tieni aperto [`docs/cheatsheet.md`](docs/cheatsheet.md) mentre lavori.
 
-## Ground rules
+## Regole di base
 
-- **Read the code in `mini_agent/`.** The lessons explain it, but the point is
-  that it is small enough to hold in your head.
-- **Break things on purpose.** Most labs have a "now break it" step. Failure
-  modes are the curriculum.
-- **Vendor-neutral by design.** Product names appear only in "In practice"
-  boxes, and only to map a concept onto tools you may already use.
+- **Leggi il codice in `mini_agent/`.** Le lezioni lo spiegano, ma il punto è
+  che è abbastanza piccolo da stare tutto in testa.
+- **Rompi le cose di proposito.** La maggior parte dei laboratori ha un passo
+  "ora fallo fallire". Le modalità di fallimento sono il curriculum.
+- **Indipendente dai vendor per design.** I nomi dei prodotti compaiono solo nei box
+  "In pratica", e solo per mappare un concetto su strumenti che potresti già usare.
 
-## Status
+## Stato
 
-Course content is under active development. See `PROGRESS.md`.
+Il contenuto del corso è in sviluppo attivo. Vedi `PROGRESS.md`.
 
-## License
+## Licenza
 
-MIT — see [`LICENSE`](LICENSE).
+MIT — vedi [`LICENSE`](LICENSE).

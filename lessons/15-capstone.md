@@ -1,82 +1,83 @@
-# 15 — Capstone: Build and Defend an Agent
+# 15 — Progetto finale: costruisci e difendi un agente
 
-> **Objectives**
-> - Build a small but real agent that uses every concept in the course.
-> - Prove it with evals, not prose.
-> - Write a retro that names what you would change.
+> **Obiettivi**
+> - Costruire un agente piccolo ma reale che usa ogni concetto del corso.
+> - Dimostrarlo con le eval, non con la prosa.
+> - Scrivere una retrospettiva che nomina cosa cambieresti.
 
-## The brief
+## Il brief
 
-Build **`repo_doctor`**: an agent that audits a repository and produces an
-actionable health report.
+Costruisci **`repo_doctor`**: un agente che analizza una repository e produce un
+report sullo stato di salute, azionabile.
 
-It must:
+Deve:
 
-1. **Use tools** to inspect a repo (files, search, tests).
-2. **Load a skill** that defines the audit procedure.
-3. **Enforce a rule with a hook** that a prompt could not guarantee.
-4. **Delegate** at least one investigation to a subagent.
-5. **Pass an eval suite** of at least five cases, including one where it must
-   *not* act.
-6. **Run headless**, with a turn and token budget, producing a report file.
+1. **Usare strumenti** per ispezionare una repo (file, ricerca, test).
+2. **Caricare una skill** che definisce la procedura di analisi.
+3. **Imporre una regola con un hook** che un prompt non potrebbe garantire.
+4. **Delegare** almeno un'indagine a un subagente.
+5. **Passare una suite di eval** di almeno cinque casi, incluso uno in cui deve
+   *non* agire.
+6. **Girare headless**, con limiti di turni e token, producendo un file di
+   report.
 
-This is deliberately small. The point is coverage of the concepts, not scale.
+È deliberatamente piccolo. Il punto è la copertura dei concetti, non la scala.
 
-## Why this project
+## Perché questo progetto
 
-A repo audit is:
+Un'analisi della repo è:
 
-- **read-mostly**, so the blast radius is small,
-- **verifiable**, because the report can be checked against the repo,
-- **multi-step**, so it exercises context and delegation,
-- **real**, in the sense that you would actually use the output.
+- **prevalentemente in lettura**, quindi il raggio d'impatto è piccolo,
+- **verificabile**, perché il report si può controllare contro la repo,
+- **multi-passo**, quindi esercita contesto e delega,
+- **reale**, nel senso che useresti davvero l'output.
 
-## Milestones
+## Traguardi
 
-### M1 — Brief and constraints (30 min)
+### M1 — Brief e vincoli (30 min)
 
-Write `capstone/BRIEF.md`:
+Scrivi `capstone/BRIEF.md`:
 
 ```markdown
-## Goal
-Audit a repo and write REPORT.md with: risky patterns, missing tests,
-stale dependencies, and a top-3 fix list.
+## Obiettivo
+Analizza una repo e scrivi REPORT.md con: pattern rischiosi, test mancanti,
+dipendenze obsolete e una lista delle prime 3 correzioni.
 
-## Non-goals
-No code changes. No network. No dependency installation.
+## Non-obiettivi
+Nessuna modifica al codice. Nessuna rete. Nessuna installazione di dipendenze.
 
-## Constraints
-Read-only workspace. Max 12 turns. Report under 100 lines.
+## Vincoli
+Workspace in sola lettura. Massimo 12 turni. Report sotto le 100 righe.
 ```
 
-Non-goals are the most important section. They are what stops the agent from
-"helpfully" fixing things.
+I non-obiettivi sono la sezione più importante. Sono ciò che impedisce all'agente
+di "sistemare" le cose di propria iniziativa.
 
-### M2 — Evals before the agent (1 h)
+### M2 — Eval prima dell'agente (1 h)
 
-Write five cases in `capstone/evals.py` **before** the implementation:
+Scrivi cinque casi in `capstone/evals.py` **prima** dell'implementazione:
 
-| Case | Setup | Expected |
+| Caso | Setup | Atteso |
 |---|---|---|
-| `finds_missing_tests` | module with no test file | report names it |
-| `finds_todo_cluster` | three `TODO` in one file | report groups them |
-| `respects_read_only` | any repo | zero file modifications |
-| `no_false_alarm` | clean repo | report says "no major issues" |
-| `reports_structure` | nested repo | report has required sections |
+| `finds_missing_tests` | modulo senza file di test | il report lo nomina |
+| `finds_todo_cluster` | tre `TODO` in un file | il report li raggruppa |
+| `respects_read_only` | una repo qualsiasi | zero file modificati |
+| `no_false_alarm` | repo pulita | il report dice "nessun problema rilevante" |
+| `reports_structure` | repo annidata | il report ha le sezioni richieste |
 
-Grading is on the report content and the workspace state, never on the
-transcript.
+La valutazione è sul contenuto del report e sullo stato del workspace, mai sulla
+trascrizione.
 
-### M3 — Tool surface (1 h)
+### M3 — Superficie degli strumenti (1 h)
 
-Start from `make_fs_tools`. Add only what the audit needs:
+Parti da `make_fs_tools`. Aggiungi solo ciò che serve all'analisi:
 
-- `list_files`, `read_file`, `search` (already there),
-- `run_tests` (allowlisted command, capped output),
-- `write_report` (the only write, to one path).
+- `list_files`, `read_file`, `search` (già presenti),
+- `run_tests` (comando in allowlist, output limitato),
+- `write_report` (l'unica scrittura, su un solo percorso).
 
-Note what you did **not** add: `delete_file`, `run_shell`. The audit does not
-need them, so they are attack surface for free.
+Nota cosa **non** hai aggiunto: `delete_file`, `run_shell`. L'analisi non ne ha
+bisogno, quindi sono superficie d'attacco gratuita.
 
 ### M4 — Skill (45 min)
 
@@ -85,98 +86,101 @@ need them, so they are attack surface for free.
 ```markdown
 ---
 name: repo-audit
-description: Audit a repository for missing tests, TODO clusters, risky
-  patterns, and stale config. Use when asked to review repo health.
+description: Analizza una repository per test mancanti, cluster di TODO,
+  pattern rischiosi e configurazione obsoleta. Usala quando ti viene chiesto
+  di rivedere la salute di una repo.
 ---
 
-1. List the top-level structure. Identify language and test layout.
-2. Find test files. Compare against source modules. List untested modules.
-3. Search for TODO/FIXME/HACK. Group by file.
-4. Check for risky patterns: eval, exec, shell=True, hardcoded secrets.
-5. Write REPORT.md with: Summary, Untested modules, TODO clusters,
+1. Elenca la struttura di primo livello. Identifica linguaggio e layout dei test.
+2. Trova i file di test. Confrontali con i moduli sorgente. Elenca i moduli non testati.
+3. Cerca TODO/FIXME/HACK. Raggruppa per file.
+4. Cerca pattern rischiosi: eval, exec, shell=True, segreti hardcoded.
+5. Scrivi REPORT.md con: Summary, Untested modules, TODO clusters,
    Risky patterns, Top 3 fixes.
-Do not modify any file except REPORT.md.
+Non modificare nessun file tranne REPORT.md.
 ```
 
-The last line is a rule, not a guarantee — which is why M5 exists.
+L'ultima riga è una regola, non una garanzia — ed è per questo che esiste M5.
 
 ### M5 — Hook (45 min)
 
-Enforce what the skill only asks for:
+Imponi ciò che la skill si limita a chiedere:
 
 ```python
 hooks.on(PRE_EDIT, deny_paths(("src", "tests", ".git", ".env")))
 ```
 
-Only `REPORT.md` is writable. A prompt says "don't modify"; a hook makes it
-impossible.
+Solo `REPORT.md` è scrivibile. Un prompt dice "non modificare"; un hook lo rende
+impossibile.
 
-Bonus: a `post_tool` hook that redacts anything matching a secret pattern, and
-a `pre_tool` audit log.
+Bonus: un hook `post_tool` che oscura qualsiasi cosa corrisponda a un pattern di
+segreto, e un log di audit su `pre_tool`.
 
-### M6 — Subagent (45 min)
+### M6 — Subagente (45 min)
 
-Delegate the security scan:
+Delega la scansione di sicurezza:
 
 ```python
 security = run_subagent(parent, "security",
-    "Scan this repo for eval/exec/shell=True/hardcoded secrets. "
-    "Report file:line for each finding. Do not edit anything.")
+    "Analizza questa repo per eval/exec/shell=True/segreti hardcoded. "
+    "Riporta file:riga per ogni risultato. Non modificare nulla.")
 ```
 
-The parent gets a summary, not 30k tokens of grep output. Verify the citations
-by reading one of them.
+Il padre riceve un riassunto, non 30k token di output di grep. Verifica le
+citazioni leggendone una.
 
-### M7 — Run and pass evals (1 h)
+### M7 — Esegui e passa le eval (1 h)
 
 ```bash
 python3 -m capstone.repo_doctor --eval
 ```
 
-Iterate on the **skill and the prompt**, not on the grader. If you find
-yourself weakening a check to pass, stop: the check is telling you something.
+Itera sulla **skill e sul prompt**, non sul valutatore. Se ti accorgi di
+indebolire un controllo per farlo passare, fermati: il controllo ti sta dicendo
+qualcosa.
 
-### M8 — Retro (30 min)
+### M8 — Retrospettiva (30 min)
 
 `capstone/RETRO.md`:
 
-- What did the agent get wrong that surprised you?
-- Which control caught it: test, hook, budget, or review?
-- What would you change about the task statement?
-- What did the subagent buy you, in tokens?
-- What is still unproven?
+- Cosa ha sbagliato l'agente che ti ha sorpreso?
+- Quale controllo l'ha catturato: test, hook, budget o revisione?
+- Cosa cambieresti nel testo del compito?
+- Cosa ti ha comprato il subagente, in token?
+- Cosa è ancora non provato?
 
-## Rubric
+## Rubrica
 
-| Criterion | Weight | Evidence |
+| Criterio | Peso | Prova |
 |---|---|---|
-| Tool surface is minimal and justified | 15% | code + BRIEF non-goals |
-| Skill actually changes behaviour | 15% | transcript shows `load_skill` |
-| Hook enforces a rule | 20% | a denied edit in the transcript |
-| Subagent used appropriately | 15% | child transcript + summary |
-| Evals are outcome-based and pass | 20% | `--eval` output |
-| Retro is honest and specific | 15% | RETRO.md |
+| La superficie degli strumenti è minima e giustificata | 15% | codice + non-obiettivi del BRIEF |
+| La skill cambia davvero il comportamento | 15% | la trascrizione mostra `load_skill` |
+| Un hook impone una regola | 20% | una modifica negata nella trascrizione |
+| Il subagente è usato in modo appropriato | 15% | trascrizione del figlio + riassunto |
+| Le eval sono sui risultati e passano | 20% | output di `--eval` |
+| La retrospettiva è onesta e specifica | 15% | RETRO.md |
 
-A project that passes evals but has a 12-tool surface with `run_shell` scores
-lower than one with four tools and a clear brief.
+Un progetto che passa le eval ma ha una superficie di 12 strumenti con
+`run_shell` vale meno di uno con quattro strumenti e un brief chiaro.
 
-## Stretch goals
+## Obiettivi extra
 
-- Add a **reviewer subagent** with a fresh context that critiques the report.
-- Add **pass@3** reporting for the flakiest case.
-- Add a **budget-exhaustion** case: a repo so large the agent must compact, and
-  the report must still be coherent.
-- Run it in CI on a schedule against a real repo and diff the reports.
+- Aggiungi un **subagente revisore** con contesto pulito che critica il report.
+- Aggiungi un **pass@3** per il caso più instabile.
+- Aggiungi un caso di **esaurimento del budget**: una repo così grande che
+  l'agente deve comprimere, e il report deve restare coerente.
+- Eseguilo in CI su un programma contro una repo vera e confronta i report.
 
-## Defense questions
+## Domande di difesa
 
-You should be able to answer these without notes:
+Dovresti saper rispondere senza appunti:
 
-1. Why is `run_shell` absent, and what would you need to add before including
-   it?
-2. Which eval would catch a regression where the agent starts editing `src/`?
-3. What does the subagent cost, and what did it save?
-4. Where could a prompt injection enter this system, and what bounds the damage?
-5. If the report is wrong, how would you find out?
+1. Perché `run_shell` è assente, e cosa ti servirebbe prima di includerlo?
+2. Quale eval catturerebbe una regressione in cui l'agente inizia a modificare
+   `src/`?
+3. Quanto costa il subagente, e cosa hai risparmiato?
+4. Da dove potrebbe entrare una prompt injection in questo sistema, e cosa limita
+   il danno?
+5. Se il report è sbagliato, come lo scopriresti?
 
-If you cannot answer 4 and 5, re-read modules 11 and 12.
+Se non sai rispondere a 4 e 5, rileggi i moduli 11 e 12.

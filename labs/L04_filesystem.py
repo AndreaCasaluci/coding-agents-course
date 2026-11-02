@@ -1,8 +1,9 @@
-"""Lab 04 — The filesystem: jails, anchors, and staleness.
+"""Laboratorio 04 — Il filesystem: prigioni, ancore e obsolescenza.
 
-Run: python3 labs/L04_filesystem.py
+Esegui: python3 labs/L04_filesystem.py
 
-Goal: reproduce the path escapes and stale-copy bugs that damage real repos.
+Obiettivo: riprodurre le evasioni di percorso e i bug da copia obsoleta che
+danneggiano le repo vere.
 """
 
 from __future__ import annotations
@@ -22,68 +23,68 @@ def main() -> None:
         ws = Workspace(tmp)
         ws.write("src/dates.py", ORIGINAL)
 
-        section("1. THE PATH JAIL")
+        section("1. LA PRIGIONE DEI PERCORSI")
         for path in ("src/dates.py", "../outside.txt", "/etc/passwd", "src/../../escape.txt"):
             try:
                 resolved = ws.resolve(path)
-                print(f"  ALLOWED  {path!r:<24} -> {resolved}")
+                print(f"  CONSENTITO {path!r:<24} -> {resolved}")
             except WorkspaceError as exc:
-                print(f"  BLOCKED  {path!r:<24} -> {exc}")
+                print(f"  BLOCCATO   {path!r:<24} -> {exc}")
 
-        section("2. SYMLINKS FOLLOW BEFORE THE CHECK")
+        section("2. I SYMLINK VENGONO SEGUITI PRIMA DEL CONTROLLO")
         outside = ws.root.parent / "outside-secret.txt"
-        outside.write_text("host secret")
+        outside.write_text("segreto dell'host")
         (ws.root / "link").symlink_to(outside)
         try:
             ws.read("link")
-            print("  ALLOWED (bad)")
+            print("  CONSENTITO (male)")
         except WorkspaceError as exc:
-            print(f"  BLOCKED  'link' -> {exc}")
-        note("resolve() follows the symlink, so containment is checked on the real path.")
-        note("This is a correctness boundary, not a security boundary (lesson 12).")
+            print(f"  BLOCCATO   'link' -> {exc}")
+        note("resolve() segue il symlink, quindi il contenimento è verificato sul percorso reale.")
+        note("Questo è un confine di correttezza, non di sicurezza (modulo 12).")
 
-        section("3. UNIQUE-ANCHOR EDITING")
+        section("3. MODIFICA CON ANCORA UNICA")
         ws.write("src/dates.py", "a\nb\nb\n")
         try:
             ws.edit("src/dates.py", "b", "c")
         except WorkspaceError as exc:
-            print(f"  AMBIGUOUS -> {exc}")
-        note("Two matches: the harness refuses rather than guessing which one.")
+            print(f"  AMBIGUO -> {exc}")
+        note("Due corrispondenze: l'harness rifiuta invece di indovinare quale.")
         ws.edit("src/dates.py", "b\nb", "b\nc")
-        print("  after unique edit:", ws.read("src/dates.py").split())
+        print("  dopo la modifica unica:", ws.read("src/dates.py").split())
 
-        section("4. TRUNCATION IS ANNOUNCED")
-        ws.write("big.log", "line of log output\n" * 5_000)
+        section("4. IL TRONCAMENTO VIENE ANNUNCIATO")
+        ws.write("big.log", "riga di log\n" * 5_000)
         out = ws.read("big.log")
-        print(f"  returned {len(out)} chars")
+        print(f"  restituiti {len(out)} caratteri")
         print("  " + out.splitlines()[-1])
-        note("Without the marker the model believes it read the whole file.")
+        note("Senza il marcatore il modello crede di aver letto tutto il file.")
 
-        section("5. THE STALE COPY BUG")
+        section("5. IL BUG DELLA COPIA OBSOLETA")
         ws.write("src/dates.py", ORIGINAL)
-        stale_copy = ws.read("src/dates.py")          # model reads v1
-        ws.write("src/dates.py", ORIGINAL + "\ndef helper():\n    return 42\n")  # user edits to v2
+        stale_copy = ws.read("src/dates.py")          # il modello legge v1
+        ws.write("src/dates.py", ORIGINAL + "\ndef helper():\n    return 42\n")  # l'utente modifica a v2
 
-        print("  disk now has a helper the model never saw.")
+        print("  il disco ora ha un helper che il modello non ha visto.")
         ws.write("src/dates.py", stale_copy.replace("return datetime", "if not s:\n        raise ValueError()\n    return datetime"))
-        print("  after write_file(stale_copy):")
-        print("   ", "helper present?", "def helper" in ws.read("src/dates.py"))
-        note("The rewrite silently destroyed the user's change. Blast radius: the file.")
+        print("  dopo write_file(copia_obsoleta):")
+        print("   ", "helper presente?", "def helper" in ws.read("src/dates.py"))
+        note("La riscrittura ha distrutto in silenzio la modifica dell'utente. Raggio d'impatto: il file.")
 
-        section("6. THE SAME MISTAKE WITH AN EDIT")
+        section("6. LO STESSO ERRORE CON UNA MODIFICA")
         ws.write("src/dates.py", ORIGINAL)
         ws.write("src/dates.py", ORIGINAL + "\ndef helper():\n    return 42\n")
         try:
             ws.edit("src/dates.py", "return datetime.strptime(s, FMT)", "if not s:\n        raise ValueError()\n    return datetime.strptime(s, FMT)")
-            print("  edit applied; helper present?", "def helper" in ws.read("src/dates.py"))
+            print("  modifica applicata; helper presente?", "def helper" in ws.read("src/dates.py"))
         except WorkspaceError as exc:
-            print(f"  edit failed loudly -> {exc}")
+            print(f"  la modifica è fallita rumorosamente -> {exc}")
 
-        section("7. TRY IT AGAIN, CORRECTLY")
+        section("7. RIPROVA, CORRETTAMENTE")
         ws.write("src/dates.py", ORIGINAL + "\ndef helper():\n    return 42\n")
-        ws.edit("src/dates.py", "def parse_date(s):", "def parse_date(s):\n    if not s:\n        raise ValueError(\"empty date\")")
+        ws.edit("src/dates.py", "def parse_date(s):", "def parse_date(s):\n    if not s:\n        raise ValueError(\"data vuota\")")
         print(ws.read("src/dates.py"))
-        note("Small anchor, bounded blast radius, user's change preserved.")
+        note("Ancora piccola, raggio limitato, modifica dell'utente preservata.")
 
 
 if __name__ == "__main__":
