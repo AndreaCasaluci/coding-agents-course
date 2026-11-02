@@ -1,3 +1,5 @@
+> 🇬🇧 **English** · 🇮🇹 [Italiano](https://github.com/AndreaCasaluci/coding-agents-course/blob/it/README.md)
+
 # AI Coding Agents — A Crash Course from Zero
 
 A vendor-neutral, hands-on course about how AI coding agents actually work:
