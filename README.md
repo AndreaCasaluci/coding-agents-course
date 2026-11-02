@@ -27,7 +27,7 @@ lessons/       16 modules, read in order
 mini_agent/    a toy agent harness you build up, one module at a time
 labs/          one runnable script per module
 capstone/      a real project that uses everything
-docs/          cheat sheet and reading list
+docs/          cheat sheet, reading list, field guide
 tests/         58 unit tests over the harness
 ```
 
@@ -72,6 +72,9 @@ run the same code against a real model.
 2. Open [`lessons/00-orientation.md`](lessons/00-orientation.md).
 3. Tick boxes in [`PROGRESS.md`](PROGRESS.md) as you go.
 4. Keep [`docs/cheatsheet.md`](docs/cheatsheet.md) open while you work.
+5. Using Claude Code or OpenCode at work? Go straight to
+   [`docs/field-guide.md`](docs/field-guide.md) to map each concept onto real
+   configuration.
 
 ## Ground rules
 
